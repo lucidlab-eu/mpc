@@ -193,8 +193,9 @@ class LucidLab_MPC_Plugin {
 		add_action( 'admin_init', array( 'LucidLab_MPC_AI', 'register_privacy_policy' ) );
 		add_action( 'admin_init', array( __CLASS__, 'stop_autoloading_scan_state' ) );
 		self::store_large_transient_in_file( 'lucidlab_mpc_cached_reg_v2' );
+		// WordPress 6.8 renamed setted_transient to set_transient; keep the old hook for 6.4-6.7.
 		add_action(
-			'setted_transient',
+			version_compare( get_bloginfo( 'version' ), '6.8', '>=' ) ? 'set_transient' : 'setted_transient',
 			static function ( $transient, $value ) {
 				if ( ! is_string( $transient ) || ! preg_match( '/^lucidlab_mpc_result_([a-z0-9-]+)_\d+$/', $transient, $match ) ) {
 					return;
@@ -410,6 +411,8 @@ class LucidLab_MPC_Plugin {
 		}
 		LucidLab_MPC_Index::stop_autobuild();
 		LucidLab_MPC_Site_Ping::stop();
+		// A deactivated plugin must not keep rewriting image requests; admin_init adds the block back on reactivation.
+		LucidLab_MPC_Webp_Rewrite::remove();
 	}
 
 	/* ---------- menu + assets ---------- */
@@ -878,7 +881,7 @@ class LucidLab_MPC_Plugin {
 				$result['images_file'] = 1;
 			}
 		}
-		// Capture before set_transient: the setted_transient hook rewrites lucidlab_mpc_summary_* with time().
+		// Capture before set_transient: the set_transient hook rewrites lucidlab_mpc_summary_* with time().
 		$preserved_updated = 0;
 		if ( $preserve_updated ) {
 			$prev = get_option( 'lucidlab_mpc_summary_' . $tab, array() );
@@ -888,7 +891,7 @@ class LucidLab_MPC_Plugin {
 		}
 		set_transient( $this->k_result( $tab ), $result, $ttl );
 		// Always refresh the summary so Completed on / snapshot counters work even when
-		// the transient is file-backed or the setted_transient listener is skipped.
+		// the transient is file-backed or the set_transient listener is skipped.
 		$counts = array();
 		foreach ( $result as $key => $value ) {
 			if ( is_int( $value ) || is_float( $value ) ) {

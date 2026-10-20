@@ -1215,6 +1215,8 @@ class LucidLab_MPC_Backup {
 		$orig = isset( $file['name'] ) && is_string( $file['name'] )
 			? strtolower( sanitize_file_name( wp_unslash( $file['name'] ) ) )
 			: '';
+		// sanitize_file_name() turns "name.sql.gz" into "name.sql_.gz" because .sql is not an allowed upload type.
+		$orig = (string) preg_replace( '/\.sql_\.gz$/', '.sql.gz', $orig );
 		$ext  = '';
 		if ( 'db' === $kind ) {
 			foreach ( array( 'sql.gz', 'sql' ) as $try ) {

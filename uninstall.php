@@ -39,6 +39,30 @@ if ( ! function_exists( 'lucidlab_mpc_uninstall_rmdir' ) ) {
 	}
 }
 
+if ( ! function_exists( 'lucidlab_mpc_uninstall_htaccess' ) ) {
+	/**
+	 * Remove the plugin's marker block from uploads/.htaccess. The file is deleted when nothing else is left in it.
+	 */
+	function lucidlab_mpc_uninstall_htaccess(): void {
+		$uploads = wp_upload_dir( null, false );
+		$base    = rtrim( str_replace( '\\', '/', (string) ( $uploads['basedir'] ?? '' ) ), '/' );
+		$file    = $base . '/.htaccess';
+		if ( '' === $base || ! is_file( $file ) || ! wp_is_writable( $file ) ) {
+			return;
+		}
+		$current = (string) file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file under uploads; WP_Filesystem may need credentials during uninstall.
+		$next    = (string) preg_replace( '/^# BEGIN Media Products Cleanup WebP.*?# END Media Products Cleanup WebP[ \t]*(?:\r?\n)?/ms', '', $current );
+		if ( $next === $current ) {
+			return;
+		}
+		if ( '' === trim( $next ) ) {
+			wp_delete_file( $file );
+			return;
+		}
+		file_put_contents( $file, $next ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Local file under uploads; WP_Filesystem may need credentials during uninstall.
+	}
+}
+
 if ( ! function_exists( 'lucidlab_mpc_uninstall_site' ) ) {
 	/**
 	 * Uninstall cleanup for the current site.
@@ -52,6 +76,9 @@ if ( ! function_exists( 'lucidlab_mpc_uninstall_site' ) ) {
 		foreach ( array( 'lucidlab_mpc_daily_purge', 'lucidlab_mpc_weekly_report', 'lucidlab_mpc_automation_weekly', 'lucidlab_mpc_automation_monthly', 'lucidlab_mpc_automation_retry', 'lucidlab_mpc_task_tick', 'lucidlab_mpc_rename_tick', 'lucidlab_mpc_webp_tick', 'lucidlab_mpc_regen_tick', 'lucidlab_mpc_index_autobuild', 'lucidlab_mpc_site_ping', 'lucidlab_mpc_backup_tick', 'lucidlab_mpc_ai_tick', 'lucidlab_mpc_pro_license_sync' ) as $hook ) {
 			wp_unschedule_hook( $hook );
 		}
+		// The plugin is gone, so its image rewrite rules go too, whether or not its data is kept.
+		lucidlab_mpc_uninstall_htaccess();
+		delete_option( 'lucidlab_mpc_webp_rewrite_hash' );
 
 		if ( ! $delete_all ) {
 			// The media index is a cache and is rebuilt on the next scan.

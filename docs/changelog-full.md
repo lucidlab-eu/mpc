@@ -3,6 +3,14 @@
 Complete release history, moved out of readme.txt on 2026-10-19 so the wordpress.org readme stays short.
 readme.txt keeps only the most recent versions. Each entry below is unchanged from the old readme.
 
+## 6.0.393
+
+* Works with Pro 6.0.281 (Pro unchanged; minimum Free stays 6.0.389).
+* Deprecation: the result-summary listener was hooked on setted_transient, deprecated in WordPress 6.8, so every scan result logged "Hook setted_transient is deprecated" with WP_DEBUG on. It now uses set_transient on WordPress 6.8+ and keeps setted_transient on 6.4–6.7.
+* Import database backup: the file name was checked after sanitize_file_name(), which turns name.sql.gz into name.sql_.gz (.sql is not an allowed upload type), so every .sql.gz import, including the plugin's own downloaded backups, was refused with "Import a .sql or .sql.gz database backup.". The .sql_.gz form is now recognised. Signature checks are unchanged: unsigned and changed dumps are still refused.
+* uploads/.htaccess: the marker block was left behind after deactivation and after uninstall, even with "Delete all plugin data" on. Deactivation now removes the block (admin_init adds it back after reactivation), and uninstall.php removes it whether or not data is kept. Everything outside the block is kept byte for byte; a file that held only the block is deleted.
+* Verified on a clean WordPress 7.1.3 / PHP 8.4 / MariaDB 11.8 install with WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY and SCRIPT_DEBUG on, with and without WooCommerce 11.2.1: no PHP notices, warnings or deprecations from the plugin.
+
 ## 6.0.392
 
 * Works with Pro 6.0.281.

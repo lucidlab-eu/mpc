@@ -4,7 +4,7 @@ Tags: media, cleanup, duplicate images, thumbnails, woocommerce
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.0.392
+Stable tag: 6.0.393
 Works with Pro: 6.0.281
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -68,6 +68,11 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 
 == Changelog ==
 
+= 6.0.393 =
+* Fixed a PHP deprecation notice on WordPress 6.8 and later (setted_transient is now set_transient).
+* Import database backup: .sql.gz files were refused with "Import a .sql or .sql.gz database backup." They are accepted again; unsigned or changed dumps are still refused.
+* Deactivating or deleting the plugin now removes its rewrite block from uploads/.htaccess (the file is deleted if nothing else is in it). Reactivating adds it back.
+
 = 6.0.392 =
 * AVIF copies are now sent as image/avif. On servers that do not know the .avif type, photo.jpg.avif was sent as image/jpeg. The rewrite block in uploads/.htaccess is updated in place on the next admin visit or daily cron; the rest of the file is left as it is.
 * Background jobs: a WebP/AVIF conversion whose page was closed, whose cron event was lost or whose Run All is gone now recovers by itself instead of blocking other jobs and Run All. A conversion with no progress for 6 hours is marked failed and releases its slot.
@@ -103,9 +108,6 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 = 6.0.385 =
 * New, off by default: an Options checkbox to tell Lucid Lab that this site uses the plugin (see External services).
 * Media index is rebuilt automatically when it no longer matches the media library.
-
-= 6.0.384 =
-* Orphan, Shared and Missing scans only use a fully built reference index, and the Logs explain what a scan result is based on.
 
 = Older versions =
 Release notes for earlier versions are at https://lucidlab.eu/changelog/ .
