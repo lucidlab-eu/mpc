@@ -162,8 +162,14 @@ class LucidLab_MPC_Webp_Rewrite {
 		}
 		$current = is_file( $file ) ? (string) file_get_contents( $file ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local streaming/atomic file I/O under uploads or wp-content; WP_Filesystem has no streaming or atomic-rename API.
 		$next    = self::merge( $current, $enabled ? self::rules( $dir ) : '' );
-		if ( $next !== $current ) {
-			file_put_contents( $file, $next ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Local streaming/atomic file I/O under uploads or wp-content; WP_Filesystem has no streaming or atomic-rename API.
+		if ( $next === $current ) {
+			return;
 		}
+		// The file held nothing but this plugin's block: remove it instead of leaving an empty .htaccess.
+		if ( '' === trim( $next ) ) {
+			wp_delete_file( $file );
+			return;
+		}
+		file_put_contents( $file, $next ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Local streaming/atomic file I/O under uploads or wp-content; WP_Filesystem has no streaming or atomic-rename API.
 	}
 }
