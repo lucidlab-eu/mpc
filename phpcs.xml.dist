@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<ruleset name="lucidlab-mpc-cleanup">
+	<description>WordPress Coding Standards for the shipped files of lucidlab-mpc-cleanup. Used by build-release.ps1; a release is refused when this reports any error or warning.</description>
+
+	<file>lucidlab-mpc-cleanup.php</file>
+	<file>uninstall.php</file>
+	<file>includes</file>
+	<file>languages</file>
+
+	<!-- Generated translation files. -->
+	<exclude-pattern>*.l10n.php</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg value="s"/>
+
+	<config name="testVersion" value="8.1-"/>
+	<config name="minimum_wp_version" value="6.4"/>
+
+	<rule ref="WordPress"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="lucidlab-mpc-cleanup"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>
