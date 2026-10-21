@@ -6669,7 +6669,10 @@ document.addEventListener('click', function(event) {
 	} );
 } )();
 
-/* Finished Jobs: collapse the panel to a thin strip at the right edge and expand it again (saved per user). */
+/* Finished Jobs: collapse the panel to a thin strip at the right edge and expand it again.
+ * The state is saved per user (user meta, the source of truth) on every click, and mirrored to
+ * localStorage so it also survives a save that did not reach the server. Other open plugin tabs
+ * follow the change, and pages restored by Back/Forward show the newest state. */
 ( function () {
 	'use strict';
 	var cfg = window.LucidLabMPC || {};
@@ -6677,37 +6680,82 @@ document.addEventListener('click', function(event) {
 	function text( key ) {
 		return Object.prototype.hasOwnProperty.call( msgs, key ) && msgs[ key ] ? msgs[ key ] : key;
 	}
-	document.querySelectorAll( '.lucidlab-mpc-finished-toggle' ).forEach( function ( button ) {
-		var panel = button.closest( '.lucidlab-mpc-finished-jobs' );
-		var body = document.getElementById( button.getAttribute( 'aria-controls' ) || '' );
-		if ( ! panel || ! body ) { return; }
-		var layout = panel.closest( '.lucidlab-mpc-jobs-layout' );
-		var icon = button.querySelector( '.dashicons' );
-		var label = button.querySelector( '.screen-reader-text' );
-		function apply( collapsed ) {
-			var name = text( collapsed ? 'Expand Finished Jobs' : 'Collapse Finished Jobs' );
-			panel.classList.toggle( 'is-collapsed', collapsed );
-			if ( layout ) { layout.classList.toggle( 'is-finished-collapsed', collapsed ); }
-			body.hidden = collapsed;
-			button.setAttribute( 'aria-expanded', collapsed ? 'false' : 'true' );
-			button.title = name;
-			if ( label ) { label.textContent = name; }
-			if ( icon ) {
-				icon.classList.toggle( 'dashicons-arrow-left-alt2', collapsed );
-				icon.classList.toggle( 'dashicons-arrow-right-alt2', ! collapsed );
-			}
+	var panel = document.getElementById( 'lucidlab-mpc-finished-jobs' );
+	var button = panel ? panel.querySelector( '.lucidlab-mpc-finished-toggle' ) : null;
+	var body = button ? document.getElementById( button.getAttribute( 'aria-controls' ) || '' ) : null;
+	if ( ! panel || ! button || ! body ) { return; }
+	var key = panel.getAttribute( 'data-store-key' ) || 'lucidlab_mpc_finished_jobs_collapsed';
+	var layout = panel.closest( '.lucidlab-mpc-jobs-layout' );
+	var icon = button.querySelector( '.dashicons' );
+	var label = button.querySelector( '.screen-reader-text' );
+	function readLocal() {
+		try {
+			var v = JSON.parse( window.localStorage.getItem( key ) || 'null' );
+			return v && typeof v.t === 'number' ? v : null;
+		} catch ( e ) { return null; }
+	}
+	function writeLocal( collapsed, at, pending ) {
+		try { window.localStorage.setItem( key, JSON.stringify( { c: collapsed ? 1 : 0, t: at, p: pending ? 1 : 0 } ) ); } catch ( e ) {}
+	}
+	function isCollapsed() { return button.getAttribute( 'aria-expanded' ) === 'false'; }
+	function apply( collapsed ) {
+		var name = button.getAttribute( collapsed ? 'data-label-expand' : 'data-label-collapse' ) || text( collapsed ? 'Expand Finished Jobs' : 'Collapse Finished Jobs' );
+		panel.classList.toggle( 'is-collapsed', collapsed );
+		if ( layout ) { layout.classList.toggle( 'is-finished-collapsed', collapsed ); }
+		body.hidden = collapsed;
+		button.setAttribute( 'aria-expanded', collapsed ? 'false' : 'true' );
+		button.title = name;
+		if ( label ) { label.textContent = name; }
+		if ( icon ) {
+			icon.classList.toggle( 'dashicons-arrow-left-alt2', collapsed );
+			icon.classList.toggle( 'dashicons-arrow-right-alt2', ! collapsed );
 		}
-		button.addEventListener( 'click', function () {
-			var collapsed = button.getAttribute( 'aria-expanded' ) === 'true';
-			apply( collapsed );
-			var body2 = new URLSearchParams();
-			body2.set( 'action', 'lucidlab_mpc_op' );
-			body2.set( 'nonce', cfg.nonce || '' );
-			body2.set( 'op', 'finished_jobs_collapse' );
-			body2.set( 'collapsed', collapsed ? '1' : '0' );
-			if ( cfg.ajaxUrl ) {
-				fetch( cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body2 } ).catch( function () {} );
-			}
+	}
+	function save( collapsed, at, attempt ) {
+		if ( ! cfg.ajaxUrl ) { return; }
+		var params = new URLSearchParams();
+		params.set( 'action', 'lucidlab_mpc_op' );
+		params.set( 'nonce', cfg.nonce || '' );
+		params.set( 'op', 'finished_jobs_collapse' );
+		params.set( 'collapsed', collapsed ? '1' : '0' );
+		params.set( 'at', String( at ) );
+		// keepalive: the save still completes when the user opens another page right after the click.
+		fetch( cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: params, keepalive: true } ).then( function ( r ) {
+			return r.json().then( function ( data ) {
+				if ( ! r.ok || ! data || ! data.success ) { throw new Error( 'HTTP ' + r.status ); }
+				var local = readLocal();
+				if ( local && local.t === at ) { writeLocal( collapsed, at, false ); }
+				panel.setAttribute( 'data-collapsed-at', String( data.data && data.data.at ? data.data.at : at ) );
+			} );
+		} ).catch( function () {
+			// Kept as pending in localStorage; retried once now and again on the next plugin page load.
+			if ( ! attempt ) { setTimeout( function () { var local = readLocal(); if ( local && local.t === at ) { save( collapsed, at, 1 ); } }, 3000 ); }
 		} );
+	}
+	button.addEventListener( 'click', function () {
+		var collapsed = ! isCollapsed();
+		var at = Math.max( Date.now(), ( parseInt( panel.getAttribute( 'data-collapsed-at' ), 10 ) || 0 ) + 1 );
+		apply( collapsed );
+		writeLocal( collapsed, at, true );
+		save( collapsed, at, 0 );
+	} );
+	// The inline boot script applied a newer browser copy, or an earlier save is still pending: save it now.
+	var local = readLocal();
+	var serverAt = parseInt( panel.getAttribute( 'data-collapsed-at' ), 10 ) || 0;
+	if ( local && ( panel.getAttribute( 'data-resync' ) === '1' || ( local.p && local.t > serverAt ) ) ) {
+		if ( !! local.c !== isCollapsed() ) { apply( !! local.c ); }
+		save( !! local.c, local.t, 0 );
+	}
+	// Another plugin tab changed it.
+	window.addEventListener( 'storage', function ( event ) {
+		if ( event.key !== key ) { return; }
+		var v = readLocal();
+		if ( v && !! v.c !== isCollapsed() ) { apply( !! v.c ); }
+	} );
+	// A page restored from the Back/Forward cache still shows the state it had when it was left.
+	window.addEventListener( 'pageshow', function ( event ) {
+		if ( ! event.persisted ) { return; }
+		var v = readLocal();
+		if ( v && !! v.c !== isCollapsed() ) { apply( !! v.c ); }
 	} );
 } )();

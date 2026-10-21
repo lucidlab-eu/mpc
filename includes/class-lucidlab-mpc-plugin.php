@@ -2546,12 +2546,23 @@ class LucidLab_MPC_Plugin {
 		// Finished Jobs panel collapsed to the right edge or expanded again (per user).
 		if ( 'finished_jobs_collapse' === $ping_op ) {
 			$collapse = isset( $this->req['collapsed'] ) && is_string( $this->req['collapsed'] ) && '1' === sanitize_text_field( wp_unslash( $this->req['collapsed'] ) );
-			if ( $collapse ) {
-				update_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs_collapsed', '1' );
-			} else {
-				delete_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs_collapsed' );
+			// Time of the click in the browser (ms), so the browser copy and this saved copy can be compared.
+			$at   = isset( $this->req['at'] ) && is_scalar( $this->req['at'] ) ? (int) preg_replace( '/\D/', '', (string) wp_unslash( $this->req['at'] ) ) : 0;
+			$at   = $at > 0 ? $at : (int) round( microtime( true ) * 1000 );
+			$user = get_current_user_id();
+			$prev = $this->finished_jobs_state();
+			// An older click that arrives late (slow request, retry) must not overwrite a newer one.
+			if ( $at >= $prev['at'] ) {
+				update_user_meta( $user, 'lucidlab_mpc_finished_jobs_collapsed', $collapse ? '1' : '0' );
+				update_user_meta( $user, 'lucidlab_mpc_finished_jobs_collapsed_at', (string) $at );
 			}
-			wp_send_json_success( array( 'collapsed' => $collapse ) );
+			$state = $this->finished_jobs_state();
+			wp_send_json_success(
+				array(
+					'collapsed' => $state['collapsed'],
+					'at'        => $state['at'],
+				)
+			);
 		}
 
 		if ( sanitize_text_field( wp_unslash( $this->req['op'] ?? '' ) ) === 'taskjob' ) {
@@ -5431,11 +5442,14 @@ class LucidLab_MPC_Plugin {
 		$history   = (array) get_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs', true );
 		$allowed   = $this->finished_job_sources();
 		$run_again = __( 'Run again', 'lucidlab-mpc-cleanup' );
-		$collapsed = $this->finished_jobs_collapsed();
-		$toggle    = $collapsed ? __( 'Expand Finished Jobs', 'lucidlab-mpc-cleanup' ) : __( 'Collapse Finished Jobs', 'lucidlab-mpc-cleanup' );
-		echo '<aside id="lucidlab-mpc-finished-jobs" class="lucidlab-mpc-finished-jobs lucidlab-mpc-card' . ( $collapsed ? ' is-collapsed' : '' ) . '" data-testid="finished-jobs">';
+		$state     = $this->finished_jobs_state();
+		$collapsed = $state['collapsed'];
+		$label_c   = __( 'Collapse Finished Jobs', 'lucidlab-mpc-cleanup' );
+		$label_e   = __( 'Expand Finished Jobs', 'lucidlab-mpc-cleanup' );
+		$toggle    = $collapsed ? $label_e : $label_c;
+		echo '<aside id="lucidlab-mpc-finished-jobs" class="lucidlab-mpc-finished-jobs lucidlab-mpc-card' . ( $collapsed ? ' is-collapsed' : '' ) . '" data-testid="finished-jobs" data-collapsed="' . ( $collapsed ? '1' : '0' ) . '" data-collapsed-at="' . esc_attr( (string) $state['at'] ) . '" data-store-key="' . esc_attr( 'lucidlab_mpc_finished_jobs_collapsed_' . get_current_user_id() ) . '">';
 		echo '<div class="lucidlab-mpc-finished-jobs-head"><h2 class="lucidlab-mpc-card__title">' . esc_html__( 'Finished Jobs', 'lucidlab-mpc-cleanup' ) . '</h2>';
-		echo '<button type="button" class="lucidlab-mpc-finished-toggle" aria-expanded="' . ( $collapsed ? 'false' : 'true' ) . '" aria-controls="lucidlab-mpc-finished-jobs-body" title="' . esc_attr( $toggle ) . '" data-testid="finished-jobs-toggle"><span class="dashicons ' . ( $collapsed ? 'dashicons-arrow-left-alt2' : 'dashicons-arrow-right-alt2' ) . '" aria-hidden="true"></span><span class="screen-reader-text">' . esc_html( $toggle ) . '</span></button></div>';
+		echo '<button type="button" class="lucidlab-mpc-finished-toggle" aria-expanded="' . ( $collapsed ? 'false' : 'true' ) . '" aria-controls="lucidlab-mpc-finished-jobs-body" title="' . esc_attr( $toggle ) . '" data-label-collapse="' . esc_attr( $label_c ) . '" data-label-expand="' . esc_attr( $label_e ) . '" data-testid="finished-jobs-toggle"><span class="dashicons ' . ( $collapsed ? 'dashicons-arrow-left-alt2' : 'dashicons-arrow-right-alt2' ) . '" aria-hidden="true"></span><span class="screen-reader-text">' . esc_html( $toggle ) . '</span></button></div>';
 		echo '<div id="lucidlab-mpc-finished-jobs-body" class="lucidlab-mpc-finished-jobs-body"' . ( $collapsed ? ' hidden' : '' ) . '><dl>';
 		foreach ( $allowed as $source => $label ) {
 			$entry   = $history[ $source ] ?? array();
@@ -5518,6 +5532,22 @@ class LucidLab_MPC_Plugin {
 			echo '<div class="lucidlab-mpc-finished-job lucidlab-mpc-finished-job--' . esc_attr( $tone ) . '" data-finished-source="' . esc_attr( $source ) . '" data-finished-status="' . esc_attr( $tone ) . '" data-finished-updated="' . esc_attr( $entry['updated'] ?? 0 ) . '" data-finished-replay="' . esc_attr( wp_json_encode( $replay ) ) . '"><dt><a href="' . esc_url( $this->tab_url( $source ) ) . '">' . esc_html( $label ) . '</a></dt><dd><span class="lucidlab-mpc-finished-status">' . esc_html( $text ) . '</span>' . wp_kses_post( $conversion_note . $actions ) . '</dd></div>';
 		}
 		echo '</dl></div></aside>';
+		// Before the panel is painted: a newer choice kept in this browser (its save did not reach the
+		// server, or another open tab changed it) wins over the saved one; admin.js then saves it.
+		wp_print_inline_script_tag( self::finished_jobs_boot_script() );
+	}
+
+	/**
+	 * Saved Finished Jobs panel state of the current user (user meta is the source of truth).
+	 *
+	 * @return array{collapsed:bool,at:int} Collapsed, and the browser time (ms) of the click that set it.
+	 */
+	private function finished_jobs_state(): array {
+		$user = get_current_user_id();
+		return array(
+			'collapsed' => '1' === (string) get_user_meta( $user, 'lucidlab_mpc_finished_jobs_collapsed', true ),
+			'at'        => (int) get_user_meta( $user, 'lucidlab_mpc_finished_jobs_collapsed_at', true ),
+		);
 	}
 
 	/**
@@ -5526,7 +5556,25 @@ class LucidLab_MPC_Plugin {
 	 * @return bool
 	 */
 	private function finished_jobs_collapsed(): bool {
-		return '1' === (string) get_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs_collapsed', true );
+		return $this->finished_jobs_state()['collapsed'];
+	}
+
+	/**
+	 * Inline script printed right after the Finished Jobs panel. It compares the saved state with the
+	 * copy in localStorage and applies the newer one before the panel is painted.
+	 *
+	 * @return string JavaScript.
+	 */
+	private static function finished_jobs_boot_script(): string {
+		return "(function(){var p=document.getElementById('lucidlab-mpc-finished-jobs');if(!p){return;}"
+			. "var k=p.getAttribute('data-store-key'),s=parseInt(p.getAttribute('data-collapsed-at'),10)||0,c=p.getAttribute('data-collapsed')==='1',v=null;"
+			. "try{v=JSON.parse(window.localStorage.getItem(k)||'null');}catch(e){v=null;}"
+			. "if(v&&typeof v.t==='number'&&v.t>s){if(!!v.c!==c){c=!!v.c;p.setAttribute('data-resync','1');}}"
+			. 'else{try{window.localStorage.setItem(k,JSON.stringify({c:c?1:0,t:s}));}catch(e){}}'
+			. "p.classList.toggle('is-collapsed',c);var l=p.closest('.lucidlab-mpc-jobs-layout');if(l){l.classList.toggle('is-finished-collapsed',c);}"
+			. "var b=document.getElementById('lucidlab-mpc-finished-jobs-body');if(b){b.hidden=c;}"
+			. "var t=p.querySelector('.lucidlab-mpc-finished-toggle');if(t){var n=t.getAttribute(c?'data-label-expand':'data-label-collapse')||'';t.setAttribute('aria-expanded',c?'false':'true');if(n){t.title=n;var r=t.querySelector('.screen-reader-text');if(r){r.textContent=n;}}"
+			. "var i=t.querySelector('.dashicons');if(i){i.classList.toggle('dashicons-arrow-left-alt2',c);i.classList.toggle('dashicons-arrow-right-alt2',!c);}}})();";
 	}
 
 	/**

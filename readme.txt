@@ -75,6 +75,7 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 * Getting started: the Free and Pro feature lists now match what each edition does.
 * Get Pro buttons now link to the Pro product page (https://lucidlab.eu/product/media-products-cleanup-pro/).
 * Finished jobs: the panel can be collapsed to the right with the arrow button next to its title, and expanded again. The choice is remembered per user.
+* Finished Jobs panel remembers its collapsed state across pages, reloads, other open plugin tabs and Back/Forward.
 * The main plugin page now uses the full screen width.
 * The Activate Pro button (Pro installed but not activated) is slightly less tall.
 = 6.0.394 =
