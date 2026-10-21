@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; }
 // JavaScript display messages; keys remain stable English source strings.
 return array(
+	'Saving…'                                              => __( 'Saving…', 'lucidlab-mpc-cleanup' ),
+	'Saved. This site now tells Lucid Lab that it uses the plugin. You can turn it off on the Options tab.' => __( 'Saved. This site now tells Lucid Lab that it uses the plugin. You can turn it off on the Options tab.', 'lucidlab-mpc-cleanup' ),
 	'Queued'                                               => __( 'Queued', 'lucidlab-mpc-cleanup' ),
 	'Queued. Starts automatically when a job slot is free.' => __( 'Queued. Starts automatically when a job slot is free.', 'lucidlab-mpc-cleanup' ),
 	' &nbsp; Failed items: '                               => __( ' &nbsp; Failed items: ', 'lucidlab-mpc-cleanup' ),

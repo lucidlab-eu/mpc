@@ -6608,3 +6608,63 @@ document.addEventListener('click', function(event) {
     });
     dialog.appendChild(grid);document.body.appendChild(dialog);dialog.addEventListener('close',function(){dialog.remove();button.focus();});dialog.showModal();
 });
+
+/* Install ping (opt-in): "Help Lucid Lab count active installs?" notice on the plugin screen. */
+( function () {
+	'use strict';
+	var cfg = window.LucidLabMPC || {};
+	var msgs = cfg.messages || {};
+	function text( key ) {
+		return Object.prototype.hasOwnProperty.call( msgs, key ) ? msgs[ key ] : key;
+	}
+	function call( params ) {
+		var body = new URLSearchParams();
+		body.set( 'action', 'lucidlab_mpc_op' );
+		body.set( 'nonce', cfg.nonce || '' );
+		Object.keys( params ).forEach( function ( k ) { body.set( k, params[ k ] ); } );
+		return fetch( cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body } ).then( function ( r ) {
+			return r.text().then( function ( raw ) {
+				var data = null;
+				try { data = JSON.parse( raw ); } catch ( e ) { data = null; }
+				if ( ! r.ok || ! data || ! data.success ) {
+					throw new Error( ( data && data.data && data.data.message ) || ( 'HTTP ' + r.status ) );
+				}
+				return data.data;
+			} );
+		} );
+	}
+	document.querySelectorAll( '[data-mpc-ping-notice]' ).forEach( function ( notice ) {
+		var yes = notice.querySelector( '[data-mpc-ping-yes]' );
+		var no = notice.querySelector( '[data-mpc-ping-no]' );
+		var message = notice.querySelector( '[data-mpc-ping-notice-message]' );
+		if ( ! yes || ! no || ! message ) { return; }
+		yes.addEventListener( 'click', function () {
+			yes.disabled = true;
+			no.disabled = true;
+			message.textContent = text( 'Saving\u2026' );
+			message.style.color = '';
+			call( { op: 'ping_save', on: '1' } ).then( function () {
+				message.textContent = text( 'Saved. This site now tells Lucid Lab that it uses the plugin. You can turn it off on the Options tab.' );
+				var row = yes.parentNode;
+				if ( row && row.parentNode ) { row.parentNode.removeChild( row ); }
+			} ).catch( function ( e ) {
+				message.textContent = e.message;
+				message.style.color = '#a12224';
+				yes.disabled = false;
+				no.disabled = false;
+			} );
+		} );
+		no.addEventListener( 'click', function () {
+			yes.disabled = true;
+			no.disabled = true;
+			call( { op: 'ping_dismiss' } ).then( function () {
+				notice.hidden = true;
+			} ).catch( function ( e ) {
+				message.textContent = e.message;
+				message.style.color = '#a12224';
+				yes.disabled = false;
+				no.disabled = false;
+			} );
+		} );
+	} );
+} )();
