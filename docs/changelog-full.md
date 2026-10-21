@@ -3,6 +3,17 @@
 Complete release history, moved out of readme.txt on 2026-10-19 so the wordpress.org readme stays short.
 readme.txt keeps only the most recent versions. Each entry below is unchanged from the old readme.
 
+## 6.0.395
+
+* Works with Pro 6.0.281 (Pro unchanged; minimum Free stays 6.0.389).
+* Install count notice: from 7 days after installation (option lucidlab_mpc_installed_at, set on activation, or on the first admin request after the update) every plugin tab except Options shows a dismissible notice "Help Lucid Lab count active installs?", with the same text and buttons as Database Cleaner. "Yes, count this site" turns the opt-in on and pings at once; "No thanks" hides the notice for that user (user meta lucidlab_mpc_ping_notice). Both go through the plugin's AJAX router (ops ping_save and ping_dismiss, nonce and manage_options checked). The Options card uses the same text.
+* Install count: sent only after an administrator opts in, also with a licensed Pro add-on. Before, licensed Pro turned the ping on without the Free opt-in through the lucidlab_mpc_site_ping_allowed filter; that filter can now only switch an opted-in site off. With licensed Pro the notice is shown like on any other site, unless the user already opted in or dismissed it. Pro's license and update checks are unchanged.
+* Install count: the ping goes to the shared Lucid Lab address https://lucidlab.eu/wp-json/lucidlab/v1/free/ping (was mpc/v1/free/ping) and the payload adds plugin = lucidlab-mpc-cleanup next to install_id, site_url and version. Triggers are unchanged: right after opting in, after each Free or Pro version change, and weekly (lucidlab_mpc_site_ping).
+* Uninstall: the install ID, last ping, install time, notice answers and the weekly event are always removed, and the opt-in is switched off, also when other plugin data is kept. Deactivation removes the weekly event.
+* Header: a Documentation link (https://lucidlab.eu/media-products-cleanup/documentation/, new tab) next to the version, as in Database Cleaner. The page title is aligned with the icon: WordPress's .wrap h1 padding is reset, as Database Cleaner does.
+* Getting started: Free and Pro feature lists match the code. Free adds broken images and links on live pages, disabling thumbnail sizes, backups and email reports, and "Scan uploads" became "Count uploads files and library references" (the Uploads Scanner is Pro). Pro adds Uploads Scanner, Duplicate Products, leftover image sizes on disk, AI file names / alt text / product copy, Review Queue and Database Cleaner; WebP conversion and delivery, background jobs and email reports are no longer listed as Pro-only.
+* Translations: Spanish strings for the notice, the Options card, the header link and the new feature lists.
+* Changed: lucidlab-mpc-cleanup.php, uninstall.php, includes/class-lucidlab-mpc-site-ping.php, includes/class-lucidlab-mpc-plugin.php, includes/admin-translations.php, assets/css/admin.css, assets/js/admin.js, languages/lucidlab-mpc-cleanup-es_ES.l10n.php, readme.txt.
 ## 6.0.394
 
 * Works with Pro 6.0.281 (Pro unchanged; minimum Free stays 6.0.389).

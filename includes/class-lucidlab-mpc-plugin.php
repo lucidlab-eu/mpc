@@ -390,6 +390,7 @@ class LucidLab_MPC_Plugin {
 		// Build the media index in the background when it is missing or empty.
 		delete_option( LucidLab_MPC_Index::SEEN_VERSION );
 		LucidLab_MPC_Index::maybe_schedule_build();
+		LucidLab_MPC_Site_Ping::mark_installed();
 		$plugin = self::instance();
 		if ( isset( $plugin->reports ) && method_exists( $plugin->reports, 'configure' ) ) {
 			$plugin->reports->configure();
@@ -2530,6 +2531,17 @@ class LucidLab_MPC_Plugin {
 			}
 			update_option( 'lucidlab_mpc_match_mode', $match_mode, false );
 			wp_send_json_success( array( 'mode' => $match_mode ) );
+		}
+
+		// Install ping opt-in notice: "Yes, count this site" and "No thanks".
+		$ping_op = sanitize_key( wp_unslash( $this->req['op'] ?? '' ) );
+		if ( 'ping_save' === $ping_op ) {
+			$ping_on = isset( $this->req['on'] ) && is_string( $this->req['on'] ) && '1' === sanitize_text_field( wp_unslash( $this->req['on'] ) );
+			wp_send_json_success( LucidLab_MPC_Site_Ping::set( $ping_on ) );
+		}
+		if ( 'ping_dismiss' === $ping_op ) {
+			LucidLab_MPC_Site_Ping::dismiss_notice();
+			wp_send_json_success( array( 'dismissed' => true ) );
 		}
 
 		if ( sanitize_text_field( wp_unslash( $this->req['op'] ?? '' ) ) === 'taskjob' ) {
@@ -5799,7 +5811,7 @@ class LucidLab_MPC_Plugin {
 						<?php
 						if ( defined( 'LUCIDLAB_MPC_PRO_VERSION' ) ) :
 							?>
-							&amp; v<?php echo esc_html( LUCIDLAB_MPC_PRO_VERSION ); ?> <?php esc_html_e( 'Pro', 'lucidlab-mpc-cleanup' ); ?><?php endif; ?></p>
+							&amp; v<?php echo esc_html( LUCIDLAB_MPC_PRO_VERSION ); ?> <?php esc_html_e( 'Pro', 'lucidlab-mpc-cleanup' ); ?><?php endif; ?> <span aria-hidden="true">·</span> <a class="lucidlab-mpc-head-link" href="<?php echo esc_url( lucidlab_mpc_docs_url() ); ?>" target="_blank" rel="noopener noreferrer" data-testid="docs-link"><?php esc_html_e( 'Documentation', 'lucidlab-mpc-cleanup' ); ?><span class="screen-reader-text"> <?php esc_html_e( '(opens in a new tab)', 'lucidlab-mpc-cleanup' ); ?></span></a></p>
 					</div>
 				</div>
 			</header>
@@ -5845,6 +5857,9 @@ class LucidLab_MPC_Plugin {
 			<div class="<?php echo esc_attr( $panel_classes ); ?>" data-mpc-panel="<?php echo esc_attr( $panel_tab ); ?>" <?php echo $panel_tab === $tab ? '' : 'hidden'; ?>>
 				<?php
 				$this->render_page_hero( $panel_tab, (string) $panel_label );
+				if ( 'options' !== $panel_tab ) {
+					$this->render_ping_notice();
+				}
 				if ( in_array( $panel_tab, LucidLab_MPC_Edition::pro_tabs(), true ) && ! LucidLab_MPC_Edition::pro() ) {
 					// Keep the locked Pro card directly under the compact header.
 					$this->render_locked_tab( $panel_tab );
@@ -6412,18 +6427,28 @@ class LucidLab_MPC_Plugin {
 		$free_features = array(
 			__( 'Find orphaned and shared media safely', 'lucidlab-mpc-cleanup' ),
 			__( 'Detect byte-identical images', 'lucidlab-mpc-cleanup' ),
-			__( 'Scan uploads and library reference counts', 'lucidlab-mpc-cleanup' ),
+			__( 'Count uploads files and library references', 'lucidlab-mpc-cleanup' ),
 			__( 'Review references before changing files', 'lucidlab-mpc-cleanup' ),
 			__( 'Restore quarantined files and undo changes', 'lucidlab-mpc-cleanup' ),
 			__( 'Rename images and regenerate thumbnails', 'lucidlab-mpc-cleanup' ),
 			__( 'Convert to WebP and compare ten images as AVIF', 'lucidlab-mpc-cleanup' ),
+			__( 'Find broken images and links on live pages', 'lucidlab-mpc-cleanup' ),
+			__( 'Disable unneeded thumbnail sizes', 'lucidlab-mpc-cleanup' ),
+			__( 'Back up the database, uploads or full site', 'lucidlab-mpc-cleanup' ),
+			__( 'Email weekly or monthly cleanup reports', 'lucidlab-mpc-cleanup' ),
 		);
 		$pro_features  = array(
 			__( 'Everything in Free, plus advanced scanners', 'lucidlab-mpc-cleanup' ),
+			__( 'Uploads Scanner for files outside the Media Library', 'lucidlab-mpc-cleanup' ),
 			__( 'Visual duplicate candidates and reference merging', 'lucidlab-mpc-cleanup' ),
-			__( 'WebP / AVIF conversion and delivery', 'lucidlab-mpc-cleanup' ),
-			__( 'Bulk workflows, Run All and background jobs', 'lucidlab-mpc-cleanup' ),
-			__( 'Scheduled scans, reports and AI-assisted review', 'lucidlab-mpc-cleanup' ),
+			__( 'Duplicate WooCommerce products by title, slug or SKU', 'lucidlab-mpc-cleanup' ),
+			__( 'Quarantine leftover image sizes on disk', 'lucidlab-mpc-cleanup' ),
+			__( 'AVIF conversion and replacing originals', 'lucidlab-mpc-cleanup' ),
+			__( 'AI file names, alt text and product copy', 'lucidlab-mpc-cleanup' ),
+			__( 'Review Queue for scanner and AI findings', 'lucidlab-mpc-cleanup' ),
+			__( 'Database Cleaner for plugin leftovers', 'lucidlab-mpc-cleanup' ),
+			__( 'Run All and parallel background jobs', 'lucidlab-mpc-cleanup' ),
+			__( 'Scheduled scans and WP-CLI commands', 'lucidlab-mpc-cleanup' ),
 		);
 		$tools         = array(
 			array( 'orphans', 'dashicons-search', __( 'Find unused media', 'lucidlab-mpc-cleanup' ), __( 'Check attachment references across products, pages, galleries and content before you quarantine anything.', 'lucidlab-mpc-cleanup' ), 'blue' ),
@@ -7782,28 +7807,60 @@ else :
 	}
 
 	/**
-	 * Options card for the install ping: an opt-in checkbox in Free (off by default), a notice when the
-	 * licensed Pro add-on sends it.
+	 * What the install ping sends, in one sentence (notice and Options tab).
+	 *
+	 * @return string
+	 */
+	private static function ping_text(): string {
+		return sprintf(
+			/* translators: %s: address the install ping is sent to. */
+			__( 'When it is on, this site sends its address (home URL), the plugin version, the plugin name and a random install ID to %s: right away, after each plugin update and once a week. Lucid Lab uses it only to count active installs. Nothing else is sent: no users, e-mail addresses, content, database data or settings. It is off by default and you can turn it off at any time on the Options tab.', 'lucidlab-mpc-cleanup' ),
+			LucidLab_MPC_Site_Ping::ENDPOINT
+		);
+	}
+
+	/**
+	 * Dismissible opt-in notice for the install ping (this plugin's screen only, once per user, from 7
+	 * days after install).
+	 */
+	private function render_ping_notice(): void {
+		static $shown = false;
+		if ( $shown || ! LucidLab_MPC_Site_Ping::show_notice() ) {
+			return;
+		}
+		$shown = true;
+		?>
+		<div class="notice inline notice-info lucidlab-mpc-ping-notice" data-mpc-ping-notice data-testid="ping-notice">
+			<div class="lucidlab-mpc-ping-notice-text">
+				<p><strong><?php esc_html_e( 'Help Lucid Lab count active installs?', 'lucidlab-mpc-cleanup' ); ?></strong></p>
+				<p><?php echo esc_html( self::ping_text() ); ?> <a href="<?php echo esc_url( 'https://lucidlab.eu/privacy/' ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Lucid Lab privacy policy', 'lucidlab-mpc-cleanup' ); ?></a></p>
+				<p class="lucidlab-mpc-hint" data-mpc-ping-notice-message role="status" aria-live="polite"></p>
+			</div>
+			<div class="lucidlab-mpc-btn-row">
+				<button type="button" class="button button-primary" data-mpc-ping-yes data-testid="ping-notice-yes"><span class="dashicons dashicons-yes" aria-hidden="true"></span> <?php esc_html_e( 'Yes, count this site', 'lucidlab-mpc-cleanup' ); ?></button>
+				<button type="button" class="button" data-mpc-ping-no data-testid="ping-notice-no"><?php esc_html_e( 'No thanks', 'lucidlab-mpc-cleanup' ); ?></button>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Options card for the install ping: an opt-in checkbox (off by default, also with Pro).
 	 *
 	 * @param array $s Settings.
 	 */
 	private function render_install_ping_field( array $s ): void {
 		$this->begin_results_card( ' data-mpc-options-section="install-ping"' );
-		$pro_sends = LucidLab_MPC_Edition::pro() && LucidLab_MPC_Site_Ping::allowed() && empty( $s['install_ping'] );
 		?>
 		<h3 class="lucidlab-mpc-card__title"><?php esc_html_e( 'Install count (optional)', 'lucidlab-mpc-cleanup' ); ?></h3>
-		<?php if ( $pro_sends ) : ?>
-			<p class="lucidlab-mpc-hint lucidlab-mpc-card__lede"><?php esc_html_e( 'Your Pro license is active, so this site already tells Lucid Lab that it runs the plugin, next to the license checks. It sends the site address (home URL), the plugin version and a random install ID to https://lucidlab.eu/wp-json/mpc/v1/free/ping after each plugin update and once a week. Nothing else is sent: no users, content, files or settings.', 'lucidlab-mpc-cleanup' ); ?></p>
-		<?php else : ?>
-			<p class="lucidlab-mpc-performance-fields">
-				<label class="lucidlab-mpc-performance-check"><input type="checkbox" name="lucidlab_mpc_install_ping" value="1" <?php checked( ! empty( $s['install_ping'] ) ); ?> data-testid="options-install-ping" /> <strong><?php esc_html_e( 'Tell Lucid Lab that this site uses the plugin', 'lucidlab-mpc-cleanup' ); ?></strong></label>
-			</p>
-			<p class="lucidlab-mpc-hint"><?php esc_html_e( 'Off by default. When you turn it on, this site sends its address (home URL), the plugin version and a random install ID to https://lucidlab.eu/wp-json/mpc/v1/free/ping: right away, after each plugin update and once a week. Lucid Lab uses it only to count active installs. Nothing else is sent: no users, content, files or settings. Turn it off to stop at once.', 'lucidlab-mpc-cleanup' ); ?></p>
-		<?php endif; ?>
+		<p class="lucidlab-mpc-performance-fields">
+			<label class="lucidlab-mpc-performance-check"><input type="checkbox" name="lucidlab_mpc_install_ping" value="1" <?php checked( ! empty( $s['install_ping'] ) ); ?> data-testid="options-install-ping" /> <strong><?php esc_html_e( 'Tell Lucid Lab that this site uses the plugin', 'lucidlab-mpc-cleanup' ); ?></strong></label>
+		</p>
+		<p class="lucidlab-mpc-hint"><?php echo esc_html( self::ping_text() ); ?></p>
 		<p class="lucidlab-mpc-hint"><a href="<?php echo esc_url( 'https://lucidlab.eu/privacy/' ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Lucid Lab privacy policy', 'lucidlab-mpc-cleanup' ); ?></a></p>
 		<?php
 		$last = LucidLab_MPC_Site_Ping::last();
-		if ( $last && ( $pro_sends || ! empty( $s['install_ping'] ) ) ) :
+		if ( $last && ! empty( $s['install_ping'] ) ) :
 			$when = wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last['time'] );
 			?>
 			<p class="lucidlab-mpc-hint" role="status">

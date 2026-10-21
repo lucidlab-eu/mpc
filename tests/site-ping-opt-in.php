@@ -1,10 +1,11 @@
 <?php
-/** Standalone regression: the install ping is opt-in in Free, automatic for licensed Pro, and stops at once on opt-out. */
+/** Standalone regression: the install ping is opt-in only (also with licensed Pro), and stops at once on opt-out. */
 declare(strict_types=1);
 
 define( 'ABSPATH', __DIR__ );
 define( 'LUCIDLAB_MPC_VERSION', '6.0.390' );
 define( 'WEEK_IN_SECONDS', 604800 );
+define( 'DAY_IN_SECONDS', 86400 );
 
 $GLOBALS['mpc_options'] = array();
 $GLOBALS['mpc_cron']    = array();
@@ -32,6 +33,11 @@ function wp_schedule_event( $ts, $recurrence, $hook ) { $GLOBALS['mpc_cron'][ $h
 function wp_clear_scheduled_hook( $hook ) { unset( $GLOBALS['mpc_cron'][ $hook ] ); return 1; }
 function wp_doing_ajax() { return $GLOBALS['mpc_ajax']; }
 function current_user_can( $cap ) { return true; }
+$GLOBALS['mpc_umeta'] = array();
+function get_current_user_id() { return 1; }
+function get_user_meta( $id, $key, $single = false ) { return $GLOBALS['mpc_umeta'][ $key ] ?? ''; }
+function update_user_meta( $id, $key, $value ) { $GLOBALS['mpc_umeta'][ $key ] = $value; return true; }
+function add_option( $name, $value = '', $deprecated = '', $autoload = null ) { if ( array_key_exists( $name, $GLOBALS['mpc_options'] ) ) { return false; } $GLOBALS['mpc_options'][ $name ] = $value; return true; }
 function home_url() { return 'https://example.test'; }
 function wp_generate_uuid4() { return '0123abcd-4567-4890-abcd-ef0123456789'; }
 function wp_json_encode( $data ) { return json_encode( $data ); }
@@ -73,11 +79,11 @@ LucidLab_MPC_Settings::update( array( 'install_ping' => 1 ) );
 mpc_assert( 1 === count( $GLOBALS['mpc_posts'] ), 'Opting in did not ping once.' );
 mpc_assert( mpc_scheduled() && 'weekly' === $GLOBALS['mpc_cron'][ LucidLab_MPC_Site_Ping::HOOK ]['recurrence'], 'Weekly event missing after opt-in.' );
 $post = $GLOBALS['mpc_posts'][0];
-mpc_assert( 'https://lucidlab.eu/wp-json/mpc/v1/free/ping' === $post['url'], 'Wrong endpoint.' );
+mpc_assert( 'https://lucidlab.eu/wp-json/lucidlab/v1/free/ping' === $post['url'], 'Wrong endpoint.' );
 $body = json_decode( $post['args']['body'], true );
-mpc_assert( array( 'install_id', 'site_url', 'version' ) === array_keys( $body ), 'Payload fields: ' . implode( ',', array_keys( $body ) ) );
+mpc_assert( array( 'install_id', 'site_url', 'version', 'plugin' ) === array_keys( $body ), 'Payload fields: ' . implode( ',', array_keys( $body ) ) );
 mpc_assert( 1 === preg_match( '/^[a-f0-9]{32}$/', $body['install_id'] ), 'install_id is not 32 hex characters (the server requires that).' );
-mpc_assert( 'https://example.test' === $body['site_url'] && '6.0.390' === $body['version'], 'site_url or version wrong.' );
+mpc_assert( 'https://example.test' === $body['site_url'] && '6.0.390' === $body['version'] && 'lucidlab-mpc-cleanup' === $body['plugin'], 'site_url, version or plugin wrong.' );
 mpc_assert( 0 === $post['args']['redirection'] && $post['args']['timeout'] <= 5, 'Request may follow redirects or block too long.' );
 
 // 4) Admin pages with the same version do not ping again; AJAX never pings.
@@ -124,24 +130,69 @@ update_option( LucidLab_MPC_Settings::OPTION, array_merge( LucidLab_MPC_Settings
 delete_option( LucidLab_MPC_Settings::OPTION );
 mpc_assert( ! mpc_scheduled(), 'Deleting the settings did not unschedule.' );
 
-// 9) Licensed Pro (filter from Pro): pings without the Free opt-in; license gone -> stops.
+// 9) Licensed Pro without the Free opt-in: no ping, no weekly event, and the notice shows after 7 days.
+//    The filter is the one Pro 6.0.281 adds (LucidLab_MPC_Pro::site_ping_allowed): $allowed || licensed.
 $GLOBALS['mpc_licensed'] = true;
 add_filter( 'lucidlab_mpc_site_ping_allowed', static fn( $a ) => (bool) $a || $GLOBALS['mpc_licensed'] );
+add_filter( 'lucidlab_mpc_site_ping_signature', static fn( $s ) => $s . '|pro:6.0.281' );
+$GLOBALS['mpc_umeta'] = array();
 $count = count( $GLOBALS['mpc_posts'] );
+mpc_assert( ! LucidLab_MPC_Site_Ping::allowed(), 'Licensed Pro allowed the ping without the opt-in.' );
 do_action( 'admin_init' );
-mpc_assert( count( $GLOBALS['mpc_posts'] ) === $count + 1 && mpc_scheduled(), 'Licensed Pro did not ping and schedule.' );
 do_action( 'lucidlab_mpc_pro_license_sync' );
-mpc_assert( count( $GLOBALS['mpc_posts'] ) === $count + 1, 'License sync pinged again without a version change.' );
-$GLOBALS['mpc_licensed'] = false;
-do_action( 'lucidlab_mpc_pro_license_sync' );
-mpc_assert( ! mpc_scheduled(), 'Unlicensed Pro kept the weekly event.' );
 do_action( LucidLab_MPC_Site_Ping::HOOK );
-mpc_assert( count( $GLOBALS['mpc_posts'] ) === $count + 1, 'Pinged after the license stopped.' );
+mpc_assert( false === LucidLab_MPC_Site_Ping::send(), 'send() went out for licensed Pro without the opt-in.' );
+mpc_assert( count( $GLOBALS['mpc_posts'] ) === $count && ! mpc_scheduled(), 'Licensed Pro pinged or scheduled without the opt-in.' );
+$GLOBALS['mpc_options'][ LucidLab_MPC_Site_Ping::INSTALLED_AT ] = time() - DAY_IN_SECONDS;
+mpc_assert( ! LucidLab_MPC_Site_Ping::show_notice(), 'Licensed Pro: notice shown before 7 days.' );
+$GLOBALS['mpc_options'][ LucidLab_MPC_Site_Ping::INSTALLED_AT ] = time() - 8 * DAY_IN_SECONDS;
+mpc_assert( LucidLab_MPC_Site_Ping::show_notice(), 'Licensed Pro: notice not shown after 7 days.' );
+// Licensed Pro + "Yes, count this site": pings once and schedules; the notice is gone.
+$result = LucidLab_MPC_Site_Ping::set( true );
+mpc_assert( $result['enabled'] && count( $GLOBALS['mpc_posts'] ) === $count + 1 && mpc_scheduled(), 'Licensed Pro: opting in did not ping and schedule.' );
+mpc_assert( ! LucidLab_MPC_Site_Ping::show_notice(), 'Licensed Pro: notice still shown after opting in.' );
+// Licensed Pro + opt-out: stops at once, the license does not keep it on.
+LucidLab_MPC_Site_Ping::set( false );
+do_action( 'lucidlab_mpc_pro_license_sync' );
+do_action( LucidLab_MPC_Site_Ping::HOOK );
+mpc_assert( count( $GLOBALS['mpc_posts'] ) === $count + 1 && ! mpc_scheduled(), 'Licensed Pro kept pinging after the opt-out.' );
+// Dismissed with licensed Pro: stays hidden.
+$GLOBALS['mpc_umeta'] = array();
+LucidLab_MPC_Site_Ping::dismiss_notice();
+mpc_assert( ! LucidLab_MPC_Site_Ping::show_notice(), 'Licensed Pro: dismissed notice shown again.' );
+// The filter can still stop an opted-in site.
+add_filter( 'lucidlab_mpc_site_ping_allowed', static fn( $a ) => false );
+LucidLab_MPC_Settings::update( array( 'install_ping' => 1 ) );
+mpc_assert( count( $GLOBALS['mpc_posts'] ) === $count + 1 && ! mpc_scheduled(), 'The filter could not stop an opted-in site.' );
+LucidLab_MPC_Settings::update( array( 'install_ping' => 0 ) );
+$GLOBALS['mpc_filters']['lucidlab_mpc_site_ping_allowed']   = array();
+$GLOBALS['mpc_filters']['lucidlab_mpc_site_ping_signature'] = array();
+$GLOBALS['mpc_umeta'] = array();
 
-// 10) Deactivation stops it.
+// 10) Opt-in notice: hidden for 7 days after install, shown afterwards, gone once answered.
+$GLOBALS['mpc_licensed'] = false;
+$GLOBALS['mpc_filters']['lucidlab_mpc_site_ping_allowed'] = array();
+LucidLab_MPC_Settings::update( array( 'install_ping' => 0 ) );
+unset( $GLOBALS['mpc_options'][ LucidLab_MPC_Site_Ping::INSTALLED_AT ] );
+LucidLab_MPC_Site_Ping::mark_installed();
+mpc_assert( ! LucidLab_MPC_Site_Ping::show_notice(), 'Notice shown before 7 days.' );
+$GLOBALS['mpc_options'][ LucidLab_MPC_Site_Ping::INSTALLED_AT ] = time() - 8 * DAY_IN_SECONDS;
+LucidLab_MPC_Site_Ping::mark_installed();
+mpc_assert( LucidLab_MPC_Site_Ping::show_notice(), 'Notice not shown after 7 days (or mark_installed() reset the time).' );
+LucidLab_MPC_Site_Ping::dismiss_notice();
+mpc_assert( ! LucidLab_MPC_Site_Ping::show_notice() && 0 === count( array_filter( (array) get_option( LucidLab_MPC_Settings::OPTION ), static fn( $v, $k ) => 'install_ping' === $k && $v, ARRAY_FILTER_USE_BOTH ) ), '"No thanks" did not hide the notice or turned the ping on.' );
+$GLOBALS['mpc_umeta'] = array();
+$count  = count( $GLOBALS['mpc_posts'] );
+$result = LucidLab_MPC_Site_Ping::set( true );
+mpc_assert( $result['enabled'] && $result['sent'] && count( $GLOBALS['mpc_posts'] ) === $count + 1 && mpc_scheduled(), '"Yes, count this site" did not ping at once and schedule.' );
+mpc_assert( ! LucidLab_MPC_Site_Ping::show_notice(), 'Notice still shown after opting in.' );
+$result = LucidLab_MPC_Site_Ping::set( false );
+mpc_assert( ! $result['enabled'] && ! mpc_scheduled(), 'set( false ) did not stop.' );
+
+// 11) Deactivation stops it.
 $GLOBALS['mpc_licensed'] = true;
 do_action( 'admin_init' );
 LucidLab_MPC_Site_Ping::stop();
 mpc_assert( ! mpc_scheduled(), 'stop() left the weekly event.' );
 
-echo "Install ping is off by default, sends only install_id, site_url and version after opt-in (now, on version change, weekly), stops at once on opt-out or reset, and runs automatically only for licensed Pro.\n";
+echo "Install ping is off by default, sends only install_id, site_url, version and plugin after opt-in (notice after 7 days or Options) (now, on version change, weekly), stops at once on opt-out or reset, and is never sent without the opt-in, also with licensed Pro (notice shown after 7 days).\n";

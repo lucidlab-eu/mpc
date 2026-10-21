@@ -80,6 +80,18 @@ if ( ! function_exists( 'lucidlab_mpc_uninstall_site' ) ) {
 		lucidlab_mpc_uninstall_htaccess();
 		delete_option( 'lucidlab_mpc_webp_rewrite_hash' );
 
+		// Optional install ping: opt-in, install ID, last ping, install time, notice answers and the weekly
+		// event are removed whether or not other data is kept, so a reinstall starts with the ping off.
+		if ( is_array( $settings ) && ! empty( $settings['install_ping'] ) ) {
+			$settings['install_ping'] = 0;
+			update_option( 'lucidlab_mpc_settings', $settings );
+		}
+		delete_option( 'lucidlab_mpc_install_id' );
+		delete_option( 'lucidlab_mpc_site_ping_last' );
+		delete_option( 'lucidlab_mpc_installed_at' );
+		delete_metadata( 'user', 0, 'lucidlab_mpc_ping_notice', '', true );
+		wp_clear_scheduled_hook( 'lucidlab_mpc_site_ping' );
+
 		if ( ! $delete_all ) {
 			// The media index is a cache and is rebuilt on the next scan.
 			$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}lucidlab_mpc_media_index" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Uninstall drops this plugin's own cache table; no core API exists.

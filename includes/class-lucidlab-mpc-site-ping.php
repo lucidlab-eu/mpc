@@ -12,16 +12,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Tells lucidlab.eu that this site runs the plugin, so Lucid Lab can count active installs.
  *
- * Off by default. Free sends nothing until an administrator ticks the opt-in box in Options. The licensed
- * Pro add-on turns it on through the lucidlab_mpc_site_ping_allowed filter, because it already talks to
- * lucidlab.eu for its license checks. Only the site address, the plugin version and a random install ID
- * are sent: when it is switched on, after each plugin update and once a week. Switching it off removes
- * the weekly event at once.
+ * Off by default, with or without Pro (shared Lucid Lab rule): nothing is sent until an administrator
+ * turns it on (Options tab, or the notice on the plugin screen, shown 7 days after install). A licensed
+ * Pro add-on does not switch it on; the lucidlab_mpc_site_ping_allowed filter can only switch it off.
+ * Only the site address, the plugin version, the plugin slug and a random install ID are sent: right
+ * after opting in, after each plugin update and once a week. Turning it off, deactivating or
+ * uninstalling the plugin removes the weekly event at once.
  */
 final class LucidLab_MPC_Site_Ping {
 
-	/** Endpoint on lucidlab.eu (theme: mpc-landing/free-installs.php, POST, install_id + site_url + version). */
-	const ENDPOINT = 'https://lucidlab.eu/wp-json/mpc/v1/free/ping';
+	/** Endpoint on lucidlab.eu (POST JSON: install_id, site_url, version, plugin). */
+	const ENDPOINT = 'https://lucidlab.eu/wp-json/lucidlab/v1/free/ping';
+
+	/** Plugin slug sent as "plugin", so lucidlab.eu knows which Free plugin pinged. */
+	const SLUG = 'lucidlab-mpc-cleanup';
 
 	/** Weekly WP-Cron hook. */
 	const HOOK = 'lucidlab_mpc_site_ping';
@@ -34,6 +38,15 @@ final class LucidLab_MPC_Site_Ping {
 
 	/** Last attempt: signature, time, HTTP code. */
 	const LAST = 'lucidlab_mpc_site_ping_last';
+
+	/** User meta: the opt-in notice was answered or dismissed. */
+	const NOTICE_META = 'lucidlab_mpc_ping_notice';
+
+	/** Unix time the plugin was installed (or first loaded after the update that added it). Not autoloaded. */
+	const INSTALLED_AT = 'lucidlab_mpc_installed_at';
+
+	/** The opt-in notice is only shown once the plugin has been installed this long. */
+	const NOTICE_DELAY = 7 * DAY_IN_SECONDS;
 
 	/** Seconds before a failed ping for the same versions is tried again from an admin page. */
 	const RETRY_AFTER = 3600;
@@ -51,18 +64,31 @@ final class LucidLab_MPC_Site_Ping {
 	}
 
 	/**
-	 * Whether the administrator opted in (Free) or a licensed Pro add-on allows it.
+	 * Whether the administrator opted in (Free setting).
+	 *
+	 * @return bool
+	 */
+	public static function opted_in(): bool {
+		return ! empty( LucidLab_MPC_Settings::get( self::SETTING ) );
+	}
+
+	/**
+	 * Whether the ping may be sent: only after the administrator opted in. Nothing (a licensed Pro
+	 * add-on included) can send it without that opt-in.
 	 *
 	 * @return bool
 	 */
 	public static function allowed(): bool {
-		$opted_in = ! empty( LucidLab_MPC_Settings::get( self::SETTING ) );
+		if ( ! self::opted_in() ) {
+			return false;
+		}
 		/**
-		 * Filters whether this site may send the install ping to lucidlab.eu.
+		 * Filters whether this site may send the install ping to lucidlab.eu after the administrator
+		 * opted in. Returning false stops it; without the opt-in it is never sent.
 		 *
-		 * @param bool $allowed True when the administrator opted in under Options.
+		 * @param bool $allowed True: the administrator opted in under Options.
 		 */
-		return (bool) apply_filters( 'lucidlab_mpc_site_ping_allowed', $opted_in );
+		return (bool) apply_filters( 'lucidlab_mpc_site_ping_allowed', true );
 	}
 
 	/**
@@ -82,18 +108,19 @@ final class LucidLab_MPC_Site_Ping {
 	/**
 	 * Exactly what is sent.
 	 *
-	 * @return array{install_id:string,site_url:string,version:string}
+	 * @return array{install_id:string,site_url:string,version:string,plugin:string}
 	 */
 	public static function payload(): array {
 		return array(
 			'install_id' => self::install_id(),
 			'site_url'   => home_url(),
 			'version'    => LUCIDLAB_MPC_VERSION,
+			'plugin'     => self::SLUG,
 		);
 	}
 
 	/**
-	 * Random install ID, created on the first ping.
+	 * Random install ID, created on the first ping (32 lowercase hex, as lucidlab.eu requires).
 	 *
 	 * @return string
 	 */
@@ -109,9 +136,11 @@ final class LucidLab_MPC_Site_Ping {
 	}
 
 	/**
-	 * Admin requests by an administrator: keep the schedule in line and ping after an update.
+	 * Admin requests by an administrator: remember the install time, keep the schedule in line and
+	 * ping after an update.
 	 */
 	public static function admin_init(): void {
+		self::installed_at();
 		if ( wp_doing_ajax() || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
@@ -152,14 +181,16 @@ final class LucidLab_MPC_Site_Ping {
 	}
 
 	/**
-	 * Opted out, Pro unlicensed or plugin deactivated: no event and no remembered ping, so a later
+	 * Opted out, stopped by the filter or plugin deactivated: no event and no remembered ping, so a later
 	 * opt-in pings again at once.
 	 */
 	public static function stop(): void {
 		if ( wp_next_scheduled( self::HOOK ) ) {
 			wp_clear_scheduled_hook( self::HOOK );
 		}
-		delete_option( self::LAST );
+		if ( false !== get_option( self::LAST, false ) ) {
+			delete_option( self::LAST );
+		}
 	}
 
 	/**
@@ -170,6 +201,34 @@ final class LucidLab_MPC_Site_Ping {
 			return;
 		}
 		self::send();
+	}
+
+	/**
+	 * Save the administrator's choice (opt-in notice or Options tab). Turning it on pings at once and
+	 * schedules the weekly event; turning it off removes the event at once. Either way the notice is
+	 * not shown to this user again.
+	 *
+	 * @param bool $on Opt in or out.
+	 *
+	 * @return array{enabled:bool,sent:bool}
+	 */
+	public static function set( bool $on ): array {
+		update_user_meta( get_current_user_id(), self::NOTICE_META, time() );
+		if ( $on && self::opted_in() ) {
+			// Already on: send again now, as a fresh opt-in would.
+			if ( false !== get_option( self::LAST, false ) ) {
+				delete_option( self::LAST );
+			}
+			self::refresh();
+		} else {
+			// Runs settings_changed(): pings and schedules on opt-in, unschedules on opt-out.
+			LucidLab_MPC_Settings::update( array( self::SETTING => $on ? 1 : 0 ) );
+		}
+		$last = self::last();
+		return array(
+			'enabled' => self::allowed(),
+			'sent'    => $on && $last && $last['ok'],
+		);
 	}
 
 	/**
@@ -187,7 +246,7 @@ final class LucidLab_MPC_Site_Ping {
 		if ( $now ) {
 			self::refresh(); // Opted in: ping now and schedule the weekly event.
 		} else {
-			self::sync_schedule(); // Opted out: unschedules at once unless licensed Pro still allows it.
+			self::sync_schedule(); // Opted out: unschedules at once.
 		}
 	}
 
@@ -277,5 +336,48 @@ final class LucidLab_MPC_Site_Ping {
 			'ok'   => ! empty( $last['ok'] ),
 			'code' => (int) ( $last['code'] ?? 0 ),
 		);
+	}
+
+	/**
+	 * Remember when the plugin was installed (activation). An existing value is kept, so deactivating and
+	 * activating again does not restart the waiting time.
+	 */
+	public static function mark_installed(): void {
+		add_option( self::INSTALLED_AT, time(), '', false );
+	}
+
+	/**
+	 * Install time. Sites that updated from a version without it get the current time on their first
+	 * admin request, so they also wait NOTICE_DELAY from the update.
+	 *
+	 * @return int
+	 */
+	public static function installed_at(): int {
+		$time = (int) get_option( self::INSTALLED_AT, 0 );
+		if ( $time <= 0 ) {
+			$time = time();
+			update_option( self::INSTALLED_AT, $time, false );
+		}
+		return $time;
+	}
+
+	/**
+	 * Whether the opt-in notice should be shown to the current user: not opted in, not answered or
+	 * dismissed, and the plugin has been installed for at least NOTICE_DELAY (7 days). Pro or no Pro.
+	 *
+	 * @return bool
+	 */
+	public static function show_notice(): bool {
+		return ! self::opted_in()
+			&& current_user_can( 'manage_options' )
+			&& ! get_user_meta( get_current_user_id(), self::NOTICE_META, true )
+			&& time() - self::installed_at() >= self::NOTICE_DELAY;
+	}
+
+	/**
+	 * Hide the opt-in notice for the current user (nothing is turned on).
+	 */
+	public static function dismiss_notice(): void {
+		update_user_meta( get_current_user_id(), self::NOTICE_META, time() );
 	}
 }

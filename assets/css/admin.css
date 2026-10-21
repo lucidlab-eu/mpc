@@ -17,9 +17,18 @@
 .lucidlab-mpc-admin-logo{width:52px;height:52px;flex:none;display:block}
 .lucidlab-mpc-admin-title-text{display:flex;flex-direction:column;gap:4px;min-width:0}
 .lucidlab-mpc-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 .35em;margin:0;padding:0;font-size:30px;line-height:1.1;letter-spacing:-.03em;font-weight:800;color:#0f2a3a}
+.lucidlab-mpc-wrap h1.lucidlab-mpc-title{padding:0;margin:0}
 .lucidlab-mpc-title-brand{color:#2271b1}
 .lucidlab-mpc-title-name{color:#0f2a3a}
 .lucidlab-mpc-ver{margin:0;font-size:12px;line-height:1.4;font-weight:600;color:#646970;letter-spacing:.02em}
+.lucidlab-mpc-wrap .lucidlab-mpc-head-link{color:#2271b1;text-decoration:none}
+.lucidlab-mpc-wrap .lucidlab-mpc-head-link:hover,.lucidlab-mpc-wrap .lucidlab-mpc-head-link:focus{color:#135e96;text-decoration:underline}
+/* Install ping notice */
+.lucidlab-mpc-wrap .lucidlab-mpc-ping-notice{display:flex;gap:12px 18px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.lucidlab-mpc-wrap .lucidlab-mpc-ping-notice[hidden]{display:none}
+.lucidlab-mpc-wrap .lucidlab-mpc-ping-notice-text{flex:1 1 420px;min-width:0}
+.lucidlab-mpc-wrap .lucidlab-mpc-ping-notice .lucidlab-mpc-btn-row{flex:none;margin:0}
+.lucidlab-mpc-wrap .lucidlab-mpc-ping-notice .lucidlab-mpc-hint:empty{display:none}
 .lucidlab-mpc-safety-banner{background:#fff8e5;border-left:4px solid #dba617;padding:12px 16px;margin:14px 0;border-radius:4px;line-height:1.5}
 .lucidlab-mpc-runall{margin:14px 0}
 .lucidlab-mpc-runall{margin-right:350px;min-height:72px}.lucidlab-mpc-regen-job-summary{max-width:760px;margin:14px 0}.lucidlab-mpc-welcome-setup-link{margin:16px 42px 0}

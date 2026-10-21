@@ -4,7 +4,7 @@ Tags: media, cleanup, duplicate images, thumbnails, woocommerce
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.0.394
+Stable tag: 6.0.395
 Works with Pro: 6.0.281
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -56,7 +56,7 @@ No. The Free plugin never contacts a licensing server and has no licence to expi
 
 AI suggestions connect only when an administrator configures a provider and requests an analysis or connection test. The selected image and any related title, filename or product text in that request, together with the configured API credential, are sent to that provider. OpenAI requests go to api.openai.com (terms: https://openai.com/policies/business-terms/ ; privacy: https://openai.com/policies/privacy-policy/). Anthropic requests go to api.anthropic.com (commercial terms: https://www.anthropic.com/legal/commercial-terms ; privacy: https://www.anthropic.com/legal/privacy). The local Ollama option sends the same analysis input to the administrator-configured local endpoint, normally 127.0.0.1:11434; it is not a hosted third-party service. AI is optional and is not contacted on activation.
 
-Install count (off by default): only when an administrator ticks "Tell Lucid Lab that this site uses the plugin" under Options, the site sends a POST request to Lucid Lab at https://lucidlab.eu/wp-json/mpc/v1/free/ping with the site address (home URL), the plugin version and a random install ID. It is sent right after opting in, after each plugin update and once a week, and is used only to count active installs. No users, content, files or settings are sent; the HTTP request necessarily includes the site's network address. Unticking the box stops it at once. If the separate Pro add-on is licensed, Pro sends the same request, because it already contacts lucidlab.eu for its license checks. Lucid Lab privacy policy: https://lucidlab.eu/privacy/ .
+Install count (off by default): only when an administrator opts in, with "Yes, count this site" in the notice shown on the plugin screen 7 days after installation or by ticking "Tell Lucid Lab that this site uses the plugin" under Options, the site sends a POST request to Lucid Lab at https://lucidlab.eu/wp-json/lucidlab/v1/free/ping with the site address (home URL), the plugin version, the plugin name and a random install ID. It is sent right after opting in, after each plugin update and once a week, and is used only to count active installs. No users, e-mail addresses, content, database data or settings are sent; the HTTP request necessarily includes the site's network address. Unticking the box stops it at once. A licensed Pro add-on does not turn it on: it is sent only after the opt-in. Lucid Lab privacy policy: https://lucidlab.eu/privacy/ .
 
 Check live pages requests only this site's own pages and the addresses they load or link to; it sends nothing to Lucid Lab. With the Pro add-on and "Check other sites" ticked, it also sends HEAD or GET requests (no cookies, no content of this site) to the other sites the pages link to or load from, which receive the site's network address and user agent like any visitor request.
 
@@ -68,6 +68,11 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 
 == Changelog ==
 
+= 6.0.395 =
+* Install count: 7 days after installation the plugin screen asks once whether this site may tell Lucid Lab that it uses the plugin, the same notice as in Database Cleaner. "Yes, count this site" turns it on, "No thanks" hides the notice. The setting stays under Options.
+* Install count: nothing is sent unless an administrator opts in, also on sites with a licensed Pro add-on. The ping now goes to the shared Lucid Lab address https://lucidlab.eu/wp-json/lucidlab/v1/free/ping and also names the plugin. Uninstalling removes the install ID and turns the setting off.
+* Header: a Documentation link next to the version number, and the page title now lines up with the icon.
+* Getting started: the Free and Pro feature lists now match what each edition does.
 = 6.0.394 =
 * Pro pages: locked Pro tabs now show a clearer Pro card with a feature list and a Get Pro button. Pro tabs carry a Pro badge in the tab menu.
 
@@ -104,9 +109,6 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 = 6.0.387 =
 * Check live pages is gentler on the host: at most 4 requests per second, a recognisable user agent, and an automatic pause and slower restart when the server answers 429 or 503.
 * Admin pages send fewer background requests, and back off when the server asks them to slow down.
-
-= 6.0.386 =
-* Check live pages is faster (parallel requests, also on WooCommerce shops) and now also checks srcset sizes, CSS backgrounds, stylesheets, scripts, fonts, video, audio, documents and internal links, with a per-page report.
 
 = Older versions =
 Release notes for earlier versions are at https://lucidlab.eu/changelog/ .
