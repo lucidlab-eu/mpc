@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Lucid Lab Media & Products Cleanup
  * Description:       Safe manual media cleanup, exact duplicate detection, usage reports, restoration and thumbnail regeneration. Extend with the separate Pro add-on.
- * Version:           6.0.393
+ * Version:           6.0.394
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Lucid Lab
@@ -27,7 +27,7 @@ if ( defined( 'LUCIDLAB_MPC_VERSION' ) ) {
 	return;
 }
 
-define( 'LUCIDLAB_MPC_VERSION', '6.0.393' );
+define( 'LUCIDLAB_MPC_VERSION', '6.0.394' );
 define( 'LUCIDLAB_MPC_FILE', __FILE__ );
 define( 'LUCIDLAB_MPC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LUCIDLAB_MPC_URL', plugin_dir_url( __FILE__ ) );

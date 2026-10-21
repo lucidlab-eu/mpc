@@ -168,24 +168,115 @@
 	outline:2px solid #2271b1;
 	outline-offset:-2px;
 }
-.lucidlab-mpc-wrap .lucidlab-mpc-tab-badge{
+/* Pro badge, locked Pro cards and tabs (same design as Lucid Lab Database Cleaner). */
+.lucidlab-mpc-wrap .lucidlab-mpc-pro-badge{
 	display:inline-block;
-	margin:0;
-	padding:1px 6px;
+	margin:0 0 0 4px;
+	padding:1px 7px;
 	border-radius:999px;
-	background:#eaf2fa;
-	color:#135e96;
-	font-size:10px;
-	line-height:1.45;
-	letter-spacing:.03em;
-	text-transform:uppercase;
+	background:linear-gradient(135deg,#2271b1,#6c3fc5);
+	color:#fff;
+	font-size:10.5px;
 	font-weight:700;
+	line-height:1.5;
+	letter-spacing:.02em;
 	vertical-align:middle;
 	flex:none;
 }
-.lucidlab-mpc-wrap .lucidlab-mpc-tabs--sidebar .nav-tab-active .lucidlab-mpc-tab-badge{
-	background:#2271b1;
+.lucidlab-mpc-wrap .lucidlab-mpc-tabs--sidebar .lucidlab-mpc-pro-badge{
+	margin:0;
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-tab-locked{
+	color:var(--mpc-card-muted,#646970);
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-card--locked{
+	border-style:dashed;
+	background:var(--mpc-card-surface,#fff);
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-card--locked .lucidlab-mpc-card__title{
+	margin:0;
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-card--locked .lucidlab-mpc-card__title,
+.lucidlab-mpc-wrap .lucidlab-mpc-card--locked .lucidlab-mpc-card__lede{
+	color:var(--mpc-card-ink-2,#50606e);
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-card--locked .lucidlab-mpc-btn-row{
+	align-items:center;
+	gap:10px;
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-card--locked .lucidlab-mpc-btn-row .lucidlab-mpc-hint{
+	margin:0;
+	color:var(--mpc-card-muted,#646970);
+	font-size:12px;
+	line-height:1.5;
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-pro-points{
+	margin:0 0 12px;
+	padding:0;
+	list-style:none;
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-pro-points li{
+	display:flex;
+	gap:6px;
+	align-items:center;
+	margin:0 0 4px;
+	color:var(--mpc-card-ink-2,#50606e);
+}
+.lucidlab-mpc-wrap .lucidlab-mpc-pro-points .dashicons{
+	color:var(--mpc-card-muted,#646970);
+	font-size:16px;
+	width:16px;
+	height:16px;
+}
+#wpbody .lucidlab-mpc-wrap .button.lucidlab-mpc-pro-link{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	gap:6px;
+	box-sizing:border-box;
+	height:32px;
+	min-height:0;
+	margin:0;
+	padding:0 14px;
+	border:1px solid #2271b1;
+	border-radius:8px;
+	background:#fff;
+	box-shadow:none;
+	color:#2271b1;
+	font-size:13px;
+	font-weight:600;
+	line-height:30px;
+	white-space:nowrap;
+	transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease;
+}
+#wpbody .lucidlab-mpc-wrap .button.lucidlab-mpc-pro-link .dashicons{
+	display:inline-flex;
+	flex:none;
+	align-items:center;
+	justify-content:center;
+	width:16px;
+	height:16px;
+	margin:0;
+	padding:0;
+	font-size:16px;
+	line-height:1;
+	vertical-align:middle;
+}
+#wpbody .lucidlab-mpc-wrap .button.lucidlab-mpc-pro-link .dashicons::before{
+	line-height:1;
+}
+#wpbody .lucidlab-mpc-wrap .button.lucidlab-mpc-pro-link:is(:hover,:focus-visible){
+	border-color:#135e96;
+	background:#135e96;
 	color:#fff;
+}
+#wpbody .lucidlab-mpc-wrap .button.lucidlab-mpc-pro-link:hover{
+	box-shadow:0 3px 8px rgba(34,113,177,.18);
+	transform:translateY(-1px);
+}
+#wpbody .lucidlab-mpc-wrap .button.lucidlab-mpc-pro-link:active{
+	box-shadow:none;
+	transform:translateY(0) scale(.98);
 }
 @media (max-width:1100px){
 	.lucidlab-mpc-admin-body{grid-template-columns:minmax(0,1fr);gap:14px}

@@ -511,7 +511,7 @@ class LucidLab_MPC_Plugin {
 		?>
 		<section class="lucidlab-mpc-page-hero lucidlab-mpc-page-hero--compact" aria-labelledby="lucidlab-mpc-page-hero-title-<?php echo esc_attr( $tab ); ?>">
 			<div>
-				<span class="lucidlab-mpc-welcome-kicker"><?php esc_html_e( 'Media & Products Cleanup', 'lucidlab-mpc-cleanup' ); ?></span>
+				<span class="lucidlab-mpc-welcome-kicker"><?php echo in_array( $tab, LucidLab_MPC_Edition::pro_tabs(), true ) ? esc_html__( 'Media & Products Cleanup Pro', 'lucidlab-mpc-cleanup' ) : esc_html__( 'Media & Products Cleanup', 'lucidlab-mpc-cleanup' ); ?></span>
 				<h2 id="lucidlab-mpc-page-hero-title-<?php echo esc_attr( $tab ); ?>"><?php echo esc_html( $label ); ?></h2>
 				<?php
 				if ( $blurb ) :
@@ -5812,11 +5812,13 @@ class LucidLab_MPC_Plugin {
 					<?php
 					$navs = $this->menu_tabs();
 					foreach ( $navs as $key => $label ) {
-						$badge = in_array( $key, LucidLab_MPC_Edition::pro_badge_tabs(), true ) ? ( ' <span class="lucidlab-mpc-tab-badge">' . esc_html__( 'Pro', 'lucidlab-mpc-cleanup' ) . '</span>' ) : '';
+						// Pro sections keep their Pro badge, also when Pro is active; locked ones are muted.
+						$is_pro_tab = in_array( $key, LucidLab_MPC_Edition::pro_badge_tabs(), true );
+						$badge      = $is_pro_tab ? ' ' . self::pro_badge() : '';
 						printf(
 							'<a href="%s" class="nav-tab %s"%s data-testid="tab-%s">%s%s</a>',
 							esc_url( $this->tab_url( $key ) ),
-							$key === $tab ? 'nav-tab-active' : '',
+							( $key === $tab ? 'nav-tab-active' : '' ) . ( $is_pro_tab && ! LucidLab_MPC_Edition::pro() ? ' lucidlab-mpc-tab-locked' : '' ),
 							$key === $tab ? ' aria-current="page"' : '',
 							esc_attr( $key ),
 							esc_html( $label ),
@@ -5844,12 +5846,8 @@ class LucidLab_MPC_Plugin {
 				<?php
 				$this->render_page_hero( $panel_tab, (string) $panel_label );
 				if ( in_array( $panel_tab, LucidLab_MPC_Edition::pro_tabs(), true ) && ! LucidLab_MPC_Edition::pro() ) {
-					// Keep the Pro-required notice directly under the compact header.
-					if ( class_exists( 'LucidLab_MPC_Pro', false ) ) {
-						$this->render_pro_license_gate();
-					} else {
-						$this->render_pro_required_notice( $this->pro_locked_message( $panel_tab ) );
-					}
+					// Keep the locked Pro card directly under the compact header.
+					$this->render_locked_tab( $panel_tab );
 					echo '</div>';
 					continue;
 				}
@@ -5961,7 +5959,7 @@ class LucidLab_MPC_Plugin {
 						break;
 					case 'uploads':
 						if ( ! LucidLab_MPC_Edition::pro() || ! method_exists( $this, 'render_uploads' ) ) {
-							$this->render_pro_locked_preview( __( 'Uploads Scanner requires the Pro add-on.', 'lucidlab-mpc-cleanup' ) );
+							$this->render_locked_tab( 'uploads' );
 							break;
 						}
 						$uploads_data  = $pick( 'uploads' );
@@ -6006,7 +6004,7 @@ class LucidLab_MPC_Plugin {
 						if ( LucidLab_MPC_Edition::pro() ) {
 							$this->render_product_copy();
 						} else {
-							$this->render_pro_locked_preview( __( 'Product AI requires the Pro add-on.', 'lucidlab-mpc-cleanup' ) );
+							$this->render_locked_tab( 'product_copy' );
 						}
 						break;
 					case 'options':
@@ -6019,7 +6017,7 @@ class LucidLab_MPC_Plugin {
 						if ( LucidLab_MPC_Edition::pro() && method_exists( $this, 'render_visual' ) ) {
 							$this->render_visual();
 						} else {
-							$this->render_pro_locked_preview( __( 'Visual comparison requires the Pro add-on.', 'lucidlab-mpc-cleanup' ) ); }
+							$this->render_locked_tab( 'visual' ); }
 						break;
 					case 'review':
 						$this->render_review_page();
@@ -6031,7 +6029,7 @@ class LucidLab_MPC_Plugin {
 						if ( LucidLab_MPC_Edition::pro() && method_exists( $this, 'render_duplicates' ) ) {
 							$this->render_duplicates( $pick( 'duplicates' ) );
 						} else {
-							$this->render_pro_locked_preview( __( 'Duplicate Products requires the Pro add-on.', 'lucidlab-mpc-cleanup' ) ); }
+							$this->render_locked_tab( 'duplicates' ); }
 						break;
 					case 'rename':
 						$this->render_rename();
@@ -6040,14 +6038,14 @@ class LucidLab_MPC_Plugin {
 						if ( LucidLab_MPC_Edition::pro() && method_exists( $this, 'render_ai_rename_panel' ) ) {
 							$this->render_ai_rename_panel();
 						} else {
-							$this->render_pro_locked_preview( __( 'AI Rename and AI Cleanup require the Pro add-on.', 'lucidlab-mpc-cleanup' ) );
+							$this->render_locked_tab( 'rename_ai' );
 						}
 						break;
 					case 'dbcleaner':
 						if ( LucidLab_MPC_Edition::pro() && method_exists( $this, 'render_dbcleaner' ) ) {
 							$this->render_dbcleaner( $pick( 'dbcleaner' ) );
 						} else {
-							$this->render_pro_locked_preview( __( 'Database Cleaner requires the Pro add-on. It finds unused database tables and leftover records from inactive or missing plugins and moves them to restorable quarantine.', 'lucidlab-mpc-cleanup' ) );
+							$this->render_locked_tab( 'dbcleaner' );
 						}
 						break;
 					case 'webp':
@@ -6085,39 +6083,153 @@ class LucidLab_MPC_Plugin {
 	}
 
 	/**
-	 * Render pro license gate.
+	 * Small "Pro" badge.
+	 *
+	 * @return string HTML.
 	 */
-	private function render_pro_license_gate(): void {
-		$reason = class_exists( 'LucidLab_MPC_License', false ) ? LucidLab_MPC_License::block_reason() : 'inactive';
-		$url    = admin_url( 'admin.php?page=lucidlab-mpc-pro-license' );
-		echo '<div class="lucidlab-mpc-license-gate">';
-		echo '<h2>';
-		if ( 'revoked' === $reason ) {
-			esc_html_e( 'This Pro license was revoked', 'lucidlab-mpc-cleanup' );
-		} elseif ( 'expired' === $reason ) {
-			esc_html_e( 'This Pro license has expired', 'lucidlab-mpc-cleanup' );
-		} elseif ( 'outage' === $reason ) {
-			esc_html_e( 'Lucid Lab has been unreachable for 7 days', 'lucidlab-mpc-cleanup' );
-		} else {
-			esc_html_e( 'The Pro license is not activated yet', 'lucidlab-mpc-cleanup' );
-		}
-		echo '</h2><p>';
-		if ( 'revoked' === $reason ) {
-			esc_html_e( 'Lucid Lab revoked this registration. Pro tools and Pro options stay off until a valid license is confirmed.', 'lucidlab-mpc-cleanup' );
-		} elseif ( 'expired' === $reason ) {
-			esc_html_e( 'The license ended and the 7-day grace period is over. Pro tools and Pro options stay off until a valid license is confirmed.', 'lucidlab-mpc-cleanup' );
-		} elseif ( 'outage' === $reason ) {
-			esc_html_e( 'Pro stays off until Lucid Lab can be reached again.', 'lucidlab-mpc-cleanup' );
-		} else {
-			esc_html_e( 'Paste the license key from your purchase email. Pro tools and Pro options stay off until Lucid Lab confirms the key.', 'lucidlab-mpc-cleanup' );
-		}
-		echo '</p><p><a class="button button-primary" href="' . esc_url( $url ) . '">';
-		esc_html_e( 'Open License', 'lucidlab-mpc-cleanup' );
-		echo '</a></p></div>';
+	private static function pro_badge(): string {
+		return '<span class="lucidlab-mpc-pro-badge">' . esc_html__( 'Pro', 'lucidlab-mpc-cleanup' ) . '</span>';
 	}
 
 	/**
-	 * Pro-required gate when the Pro plugin is missing (same card as the license gate). Buy now links to Lucid Lab pricing; licensed-but-inactive uses render_pro_license_gate().
+	 * "Get Pro" link.
+	 *
+	 * @param string $context Where the link is shown (added to the URL for statistics).
+	 *
+	 * @return string HTML.
+	 */
+	private static function pro_link( string $context ): string {
+		$url = LucidLab_MPC_Edition::pro_url();
+		if ( '#' !== $url ) {
+			$url = add_query_arg( 'utm_content', rawurlencode( $context ), $url );
+		}
+		return '<a class="button lucidlab-mpc-pro-link" href="' . esc_url( $url ) . '"' . ( '#' === $url ? '' : ' target="_blank" rel="noopener noreferrer"' ) . ' data-testid="pro-get-link"><span class="dashicons dashicons-star-filled" aria-hidden="true"></span> ' . esc_html__( 'Get Pro', 'lucidlab-mpc-cleanup' ) . '</a>';
+	}
+
+	/**
+	 * Pro tools. While Pro is not active their tabs are listed with a Pro badge and only show a
+	 * locked card that describes the tool.
+	 *
+	 * @return array<string,array{text:string,points:array<int,string>}>
+	 */
+	private static function pro_features(): array {
+		return array(
+			'uploads'      => array(
+				'text'   => __( 'Finds files in the uploads folder that are not in the Media Library and are not named in content, and moves the ones you select to restorable quarantine.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'Files on disk that no Media Library item uses', 'lucidlab-mpc-cleanup' ),
+					__( 'Files still named in posts, products or settings are kept', 'lucidlab-mpc-cleanup' ),
+					__( 'Selected files move to restorable quarantine', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+			'visual'       => array(
+				'text'   => __( 'Finds look-alike images, such as resized or recompressed copies, for you to review. Nothing merges automatically.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'Groups sorted by the space a merge really frees', 'lucidlab-mpc-cleanup' ),
+					__( 'You choose which image to keep in every group', 'lucidlab-mpc-cleanup' ),
+					__( 'Merges can be undone from the Quarantine tab', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+			'duplicates'   => array(
+				'text'   => __( 'Finds WooCommerce products that share a title, a slug, or a title and SKU, so you can review the duplicates before you change anything.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'Matches on title, slug, or title and SKU', 'lucidlab-mpc-cleanup' ),
+					__( 'Review every group before anything changes', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+			'rename_ai'    => array(
+				'text'   => __( 'Suggests file names and alt texts based on what each image shows. You review every suggestion before it is applied.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'File name and alt-text suggestions from the image itself', 'lucidlab-mpc-cleanup' ),
+					__( 'Nothing is applied until you approve it', 'lucidlab-mpc-cleanup' ),
+					__( 'Applied renames can be undone', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+			'product_copy' => array(
+				'text'   => __( 'Creates AI product titles, short descriptions and long descriptions from the featured image, for you to review before they are saved.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'Titles, short descriptions and long descriptions', 'lucidlab-mpc-cleanup' ),
+					__( 'Review and edit every suggestion before it is saved', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+			'review'       => array(
+				'text'   => __( 'One list of scanner and AI findings to triage before you quarantine or rename anything.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'Findings of the scanners and AI tools in one place', 'lucidlab-mpc-cleanup' ),
+					__( 'Filter by scanner source and minimum finding count', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+			'dbcleaner'    => array(
+				'text'   => __( 'Finds unused database tables and leftover records from inactive or missing plugins and moves them to restorable quarantine.', 'lucidlab-mpc-cleanup' ),
+				'points' => array(
+					__( 'Leftover options, meta, plugin post types and expired transients', 'lucidlab-mpc-cleanup' ),
+					__( 'Action Scheduler logs, WooCommerce sessions, spam and trashed comments', 'lucidlab-mpc-cleanup' ),
+					__( 'Everything moves to restorable quarantine first', 'lucidlab-mpc-cleanup' ),
+				),
+			),
+		);
+	}
+
+	/**
+	 * A locked Pro tab: a disabled card that describes the Pro tool (Pro missing, or installed
+	 * without a valid license).
+	 *
+	 * @param string $tab Tab.
+	 */
+	private function render_locked_tab( string $tab ): void {
+		$features = self::pro_features();
+		$feature  = $features[ $tab ] ?? array(
+			'text'   => '',
+			'points' => array(),
+		);
+		$title    = $this->menu_tabs()[ $tab ] ?? __( 'Pro tool', 'lucidlab-mpc-cleanup' );
+		?>
+		<div class="lucidlab-mpc-card lucidlab-mpc-card--locked" aria-disabled="true" data-testid="pro-locked-card">
+			<div class="lucidlab-mpc-card__head">
+				<h3 class="lucidlab-mpc-card__title"><?php echo esc_html( $title ); ?> <?php echo wp_kses_post( self::pro_badge() ); ?></h3>
+				<?php if ( '' !== $feature['text'] ) : ?>
+					<p class="lucidlab-mpc-card__lede"><?php echo esc_html( $feature['text'] ); ?></p>
+				<?php endif; ?>
+			</div>
+			<?php if ( $feature['points'] ) : ?>
+				<ul class="lucidlab-mpc-pro-points">
+					<?php foreach ( $feature['points'] as $point ) : ?>
+						<li><span class="dashicons dashicons-lock" aria-hidden="true"></span> <?php echo esc_html( $point ); ?></li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
+			<div class="lucidlab-mpc-btn-row">
+				<?php echo self::pro_link( $tab ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in pro_link(). ?>
+				<span class="lucidlab-mpc-hint"><?php echo esc_html( $this->pro_card_hint() ); ?></span>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Hint next to the "Get Pro" button of a locked Pro card.
+	 *
+	 * @return string
+	 */
+	private function pro_card_hint(): string {
+		if ( ! class_exists( 'LucidLab_MPC_Pro', false ) ) {
+			return __( 'Available in the Lucid Lab Media & Products Cleanup Pro add-on. The free tools on the other tabs keep working without it.', 'lucidlab-mpc-cleanup' );
+		}
+		$reason = class_exists( 'LucidLab_MPC_License', false ) ? LucidLab_MPC_License::block_reason() : 'inactive';
+		if ( 'revoked' === $reason ) {
+			return __( 'The Pro add-on is installed, but Lucid Lab revoked this license: save a valid license under Media & Products Cleanup → License.', 'lucidlab-mpc-cleanup' );
+		}
+		if ( 'expired' === $reason ) {
+			return __( 'The Pro add-on is installed, but its license has expired and the 7-day grace period is over: renew it or save a valid license under Media & Products Cleanup → License.', 'lucidlab-mpc-cleanup' );
+		}
+		if ( 'outage' === $reason ) {
+			return __( 'The Pro add-on is installed, but Lucid Lab has been unreachable for 7 days. Pro stays off until Lucid Lab can be reached again; the status is under Media & Products Cleanup → License.', 'lucidlab-mpc-cleanup' );
+		}
+		return __( 'The Pro add-on is installed: activate its license under Media & Products Cleanup → License.', 'lucidlab-mpc-cleanup' );
+	}
+
+	/**
+	 * Pro-required notice inside a section (quarantine sets of a Pro source). Locked Pro tabs use render_locked_tab().
 	 *
 	 * @param string $message Message.
 	 */
@@ -6128,35 +6240,6 @@ class LucidLab_MPC_Plugin {
 		echo '<p><a class="button button-primary" href="' . esc_url( 'https://lucidlab.eu/#pricing' ) . '" target="_blank" rel="noopener noreferrer">';
 		esc_html_e( 'Buy now!', 'lucidlab-mpc-cleanup' );
 		echo '</a></p></div>';
-	}
-
-	/**
-	 * Pro-locked message for a tab (no preview-gallery copy).
-	 *
-	 * @param string $tab Tab.
-	 *
-	 * @return string
-	 */
-	private function pro_locked_message( string $tab ): string {
-		$messages = array(
-			'uploads'      => __( 'Uploads Scanner requires the Pro add-on.', 'lucidlab-mpc-cleanup' ),
-			'duplicates'   => __( 'Duplicate Products requires the Pro add-on.', 'lucidlab-mpc-cleanup' ),
-			'visual'       => __( 'Visual comparison requires the Pro add-on.', 'lucidlab-mpc-cleanup' ),
-			'review'       => __( 'The Review Queue requires the Pro add-on.', 'lucidlab-mpc-cleanup' ),
-			'rename_ai'    => __( 'AI Rename and AI Cleanup require the Pro add-on.', 'lucidlab-mpc-cleanup' ),
-			'product_copy' => __( 'Product AI requires the Pro add-on.', 'lucidlab-mpc-cleanup' ),
-			'dbcleaner'    => __( 'Database Cleaner requires the Pro add-on. It finds unused database tables and leftover records from inactive or missing plugins and moves them to restorable quarantine.', 'lucidlab-mpc-cleanup' ),
-		);
-		return $messages[ $tab ] ?? __( 'This tool requires the Pro add-on.', 'lucidlab-mpc-cleanup' );
-	}
-
-	/**
-	 * Locked Pro tool notice only — preview galleries belong on WebP / AVIF alone.
-	 *
-	 * @param string $message Message.
-	 */
-	private function render_pro_locked_preview( string $message ): void {
-		$this->render_pro_required_notice( $message );
 	}
 
 	/**
@@ -6768,7 +6851,7 @@ else :
 		if ( LucidLab_MPC_Edition::pro() && method_exists( $this, 'render_review' ) ) {
 			$this->render_review();
 			return; }
-		$this->render_pro_locked_preview( __( 'The Review Queue requires the Pro add-on.', 'lucidlab-mpc-cleanup' ) );
+		$this->render_locked_tab( 'review' );
 	}
 
 	/**
@@ -9582,7 +9665,7 @@ endif;
 		echo '<label class="lucidlab-mpc-performance-check"><input type="checkbox" id="lucidlab-mpc-crawl-links" value="1" ' . checked( $options['links'], true, false ) . ' data-testid="crawl-links" /> ' . esc_html__( 'Also check links to other pages of this site', 'lucidlab-mpc-cleanup' ) . '</label> ';
 		echo '<label class="lucidlab-mpc-performance-check"><input type="checkbox" id="lucidlab-mpc-crawl-external" value="1" ' . checked( $pro && $options['external'], true, false ) . disabled( $pro, false, false ) . ' data-testid="crawl-external" /> ' . esc_html__( 'Also check images, files and links on other sites', 'lucidlab-mpc-cleanup' );
 		if ( ! $pro ) {
-			echo ' <span class="lucidlab-mpc-tab-badge">' . esc_html__( 'Pro', 'lucidlab-mpc-cleanup' ) . '</span>';
+			echo ' ' . wp_kses_post( self::pro_badge() );
 		}
 		echo '</label></p>';
 		echo '<p class="lucidlab-mpc-btn-row"><button type="button" class="button" id="lucidlab-mpc-crawl-scan" data-mpc-scan="crawl">' . esc_html__( 'Check live pages', 'lucidlab-mpc-cleanup' ) . '</button>';

@@ -3,6 +3,11 @@
 Complete release history, moved out of readme.txt on 2026-10-19 so the wordpress.org readme stays short.
 readme.txt keeps only the most recent versions. Each entry below is unchanged from the old readme.
 
+## 6.0.394
+
+* Works with Pro 6.0.281 (Pro unchanged; minimum Free stays 6.0.389).
+* Pro pages: while Pro is not active, locked Pro tabs show a clearer Pro card (title with Pro badge, list of the features on that page and a Get Pro button). Pro tabs keep a Pro badge in the plugin's tab menu, also when Pro is active; locked tabs are muted. Changed: includes/class-lucidlab-mpc-plugin.php, includes/class-lucidlab-mpc-edition.php, assets/css/admin.css.
+
 ## 6.0.393
 
 * Works with Pro 6.0.281 (Pro unchanged; minimum Free stays 6.0.389).
