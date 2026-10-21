@@ -34,7 +34,11 @@ final class LucidLab_MPC_Edition {
 		return self::pro_tabs();
 	}
 	/**
-	 * Address of the "Get Pro" links on locked Pro tabs.
+	 * Lucid Lab product page of the Pro add-on. Every "Get Pro" / buy button links here.
+	 */
+	const PRO_URL = 'https://lucidlab.eu/product/media-products-cleanup-pro/';
+	/**
+	 * Address of every "Get Pro" / buy link in the Free admin (locked Pro cards, Pro-required notices).
 	 *
 	 * @return string
 	 */
@@ -42,9 +46,9 @@ final class LucidLab_MPC_Edition {
 		/**
 		 * Filters the "Get Pro" link target.
 		 *
-		 * @param string $url Default the Lucid Lab product page.
+		 * @param string $url Default the Lucid Lab Pro product page.
 		 */
-		return (string) apply_filters( 'lucidlab_mpc_pro_url', 'https://lucidlab.eu/product/media-products-cleanup/' );
+		return (string) apply_filters( 'lucidlab_mpc_pro_url', self::PRO_URL );
 	}
 	/**
 	 * Pro quarantine source.

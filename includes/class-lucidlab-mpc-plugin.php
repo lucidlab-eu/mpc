@@ -341,7 +341,7 @@ class LucidLab_MPC_Plugin {
 			<div class="lucidlab-mpc-pro-notice lucidlab-mpc-pro-notice--inactive">
 				<p><?php esc_html_e( 'Media & Products Cleanup Pro is installed but not activated. Activate it to unlock Pro tools on this site.', 'lucidlab-mpc-cleanup' ); ?></p>
 				<p class="lucidlab-mpc-pro-inactive-actions">
-					<a class="button button-primary" href="<?php echo esc_url( $activate ); ?>" data-testid="activate-pro"><?php esc_html_e( 'Activate Pro', 'lucidlab-mpc-cleanup' ); ?></a>
+					<a class="button button-primary lucidlab-mpc-activate-pro" href="<?php echo esc_url( $activate ); ?>" data-testid="activate-pro"><?php esc_html_e( 'Activate Pro', 'lucidlab-mpc-cleanup' ); ?></a>
 					<a class="lucidlab-mpc-pro-inactive-dismiss" href="<?php echo esc_url( $dismiss ); ?>" data-testid="dismiss-pro-inactive"><?php esc_html_e( 'Hide this message', 'lucidlab-mpc-cleanup' ); ?></a>
 				</p>
 			</div>
@@ -2542,6 +2542,16 @@ class LucidLab_MPC_Plugin {
 		if ( 'ping_dismiss' === $ping_op ) {
 			LucidLab_MPC_Site_Ping::dismiss_notice();
 			wp_send_json_success( array( 'dismissed' => true ) );
+		}
+		// Finished Jobs panel collapsed to the right edge or expanded again (per user).
+		if ( 'finished_jobs_collapse' === $ping_op ) {
+			$collapse = isset( $this->req['collapsed'] ) && is_string( $this->req['collapsed'] ) && '1' === sanitize_text_field( wp_unslash( $this->req['collapsed'] ) );
+			if ( $collapse ) {
+				update_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs_collapsed', '1' );
+			} else {
+				delete_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs_collapsed' );
+			}
+			wp_send_json_success( array( 'collapsed' => $collapse ) );
 		}
 
 		if ( sanitize_text_field( wp_unslash( $this->req['op'] ?? '' ) ) === 'taskjob' ) {
@@ -5421,7 +5431,12 @@ class LucidLab_MPC_Plugin {
 		$history   = (array) get_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs', true );
 		$allowed   = $this->finished_job_sources();
 		$run_again = __( 'Run again', 'lucidlab-mpc-cleanup' );
-		echo '<aside class="lucidlab-mpc-finished-jobs lucidlab-mpc-card"><h2 class="lucidlab-mpc-card__title">' . esc_html__( 'Finished Jobs', 'lucidlab-mpc-cleanup' ) . '</h2><dl>';
+		$collapsed = $this->finished_jobs_collapsed();
+		$toggle    = $collapsed ? __( 'Expand Finished Jobs', 'lucidlab-mpc-cleanup' ) : __( 'Collapse Finished Jobs', 'lucidlab-mpc-cleanup' );
+		echo '<aside id="lucidlab-mpc-finished-jobs" class="lucidlab-mpc-finished-jobs lucidlab-mpc-card' . ( $collapsed ? ' is-collapsed' : '' ) . '" data-testid="finished-jobs">';
+		echo '<div class="lucidlab-mpc-finished-jobs-head"><h2 class="lucidlab-mpc-card__title">' . esc_html__( 'Finished Jobs', 'lucidlab-mpc-cleanup' ) . '</h2>';
+		echo '<button type="button" class="lucidlab-mpc-finished-toggle" aria-expanded="' . ( $collapsed ? 'false' : 'true' ) . '" aria-controls="lucidlab-mpc-finished-jobs-body" title="' . esc_attr( $toggle ) . '" data-testid="finished-jobs-toggle"><span class="dashicons ' . ( $collapsed ? 'dashicons-arrow-left-alt2' : 'dashicons-arrow-right-alt2' ) . '" aria-hidden="true"></span><span class="screen-reader-text">' . esc_html( $toggle ) . '</span></button></div>';
+		echo '<div id="lucidlab-mpc-finished-jobs-body" class="lucidlab-mpc-finished-jobs-body"' . ( $collapsed ? ' hidden' : '' ) . '><dl>';
 		foreach ( $allowed as $source => $label ) {
 			$entry   = $history[ $source ] ?? array();
 			$summary = get_option( 'lucidlab_mpc_summary_' . $source, array() );
@@ -5502,7 +5517,16 @@ class LucidLab_MPC_Plugin {
 			}
 			echo '<div class="lucidlab-mpc-finished-job lucidlab-mpc-finished-job--' . esc_attr( $tone ) . '" data-finished-source="' . esc_attr( $source ) . '" data-finished-status="' . esc_attr( $tone ) . '" data-finished-updated="' . esc_attr( $entry['updated'] ?? 0 ) . '" data-finished-replay="' . esc_attr( wp_json_encode( $replay ) ) . '"><dt><a href="' . esc_url( $this->tab_url( $source ) ) . '">' . esc_html( $label ) . '</a></dt><dd><span class="lucidlab-mpc-finished-status">' . esc_html( $text ) . '</span>' . wp_kses_post( $conversion_note . $actions ) . '</dd></div>';
 		}
-		echo '</dl></aside>';
+		echo '</dl></div></aside>';
+	}
+
+	/**
+	 * Whether the current user collapsed the Finished Jobs panel to the right edge.
+	 *
+	 * @return bool
+	 */
+	private function finished_jobs_collapsed(): bool {
+		return '1' === (string) get_user_meta( get_current_user_id(), 'lucidlab_mpc_finished_jobs_collapsed', true );
 	}
 
 	/**
@@ -5817,7 +5841,7 @@ class LucidLab_MPC_Plugin {
 			</header>
 			<hr class="wp-header-end">
 
-			<div class="lucidlab-mpc-jobs-layout"><div class="lucidlab-mpc-main-column">
+			<div class="lucidlab-mpc-jobs-layout<?php echo $this->finished_jobs_collapsed() ? ' is-finished-collapsed' : ''; ?>"><div class="lucidlab-mpc-main-column">
 			<div class="lucidlab-mpc-admin-body">
 			<aside class="lucidlab-mpc-nav-card lucidlab-mpc-card">
 			<nav class="lucidlab-mpc-tabs lucidlab-mpc-tabs--sidebar" aria-label="<?php esc_attr_e( 'Media & Products Cleanup sections', 'lucidlab-mpc-cleanup' ); ?>">
@@ -6107,18 +6131,15 @@ class LucidLab_MPC_Plugin {
 	}
 
 	/**
-	 * "Get Pro" link.
+	 * "Get Pro" link. Links to the Pro product page (LucidLab_MPC_Edition::pro_url()) as is.
 	 *
-	 * @param string $context Where the link is shown (added to the URL for statistics).
+	 * @param string $context Where the link is shown (kept as a data attribute).
 	 *
 	 * @return string HTML.
 	 */
 	private static function pro_link( string $context ): string {
 		$url = LucidLab_MPC_Edition::pro_url();
-		if ( '#' !== $url ) {
-			$url = add_query_arg( 'utm_content', rawurlencode( $context ), $url );
-		}
-		return '<a class="button lucidlab-mpc-pro-link" href="' . esc_url( $url ) . '"' . ( '#' === $url ? '' : ' target="_blank" rel="noopener noreferrer"' ) . ' data-testid="pro-get-link"><span class="dashicons dashicons-star-filled" aria-hidden="true"></span> ' . esc_html__( 'Get Pro', 'lucidlab-mpc-cleanup' ) . '</a>';
+		return '<a class="button lucidlab-mpc-pro-link" href="' . esc_url( $url ) . '"' . ( '#' === $url ? '' : ' target="_blank" rel="noopener noreferrer"' ) . ' data-pro-context="' . esc_attr( $context ) . '" data-testid="pro-get-link"><span class="dashicons dashicons-star-filled" aria-hidden="true"></span> ' . esc_html__( 'Get Pro', 'lucidlab-mpc-cleanup' ) . '</a>';
 	}
 
 	/**
@@ -6252,7 +6273,7 @@ class LucidLab_MPC_Plugin {
 		echo '<div class="lucidlab-mpc-license-gate lucidlab-mpc-license-gate--buy" role="status" data-testid="pro-buy-gate">';
 		echo '<h2>' . esc_html__( 'This tool requires the Pro add-on', 'lucidlab-mpc-cleanup' ) . '</h2>';
 		echo '<p>' . esc_html( $message ) . '</p>';
-		echo '<p><a class="button button-primary" href="' . esc_url( 'https://lucidlab.eu/#pricing' ) . '" target="_blank" rel="noopener noreferrer">';
+		echo '<p><a class="button button-primary" href="' . esc_url( LucidLab_MPC_Edition::pro_url() ) . '" target="_blank" rel="noopener noreferrer" data-testid="pro-buy-link">';
 		esc_html_e( 'Buy now!', 'lucidlab-mpc-cleanup' );
 		echo '</a></p></div>';
 	}

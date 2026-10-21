@@ -6668,3 +6668,46 @@ document.addEventListener('click', function(event) {
 		} );
 	} );
 } )();
+
+/* Finished Jobs: collapse the panel to a thin strip at the right edge and expand it again (saved per user). */
+( function () {
+	'use strict';
+	var cfg = window.LucidLabMPC || {};
+	var msgs = cfg.messages || {};
+	function text( key ) {
+		return Object.prototype.hasOwnProperty.call( msgs, key ) && msgs[ key ] ? msgs[ key ] : key;
+	}
+	document.querySelectorAll( '.lucidlab-mpc-finished-toggle' ).forEach( function ( button ) {
+		var panel = button.closest( '.lucidlab-mpc-finished-jobs' );
+		var body = document.getElementById( button.getAttribute( 'aria-controls' ) || '' );
+		if ( ! panel || ! body ) { return; }
+		var layout = panel.closest( '.lucidlab-mpc-jobs-layout' );
+		var icon = button.querySelector( '.dashicons' );
+		var label = button.querySelector( '.screen-reader-text' );
+		function apply( collapsed ) {
+			var name = text( collapsed ? 'Expand Finished Jobs' : 'Collapse Finished Jobs' );
+			panel.classList.toggle( 'is-collapsed', collapsed );
+			if ( layout ) { layout.classList.toggle( 'is-finished-collapsed', collapsed ); }
+			body.hidden = collapsed;
+			button.setAttribute( 'aria-expanded', collapsed ? 'false' : 'true' );
+			button.title = name;
+			if ( label ) { label.textContent = name; }
+			if ( icon ) {
+				icon.classList.toggle( 'dashicons-arrow-left-alt2', collapsed );
+				icon.classList.toggle( 'dashicons-arrow-right-alt2', ! collapsed );
+			}
+		}
+		button.addEventListener( 'click', function () {
+			var collapsed = button.getAttribute( 'aria-expanded' ) === 'true';
+			apply( collapsed );
+			var body2 = new URLSearchParams();
+			body2.set( 'action', 'lucidlab_mpc_op' );
+			body2.set( 'nonce', cfg.nonce || '' );
+			body2.set( 'op', 'finished_jobs_collapse' );
+			body2.set( 'collapsed', collapsed ? '1' : '0' );
+			if ( cfg.ajaxUrl ) {
+				fetch( cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body2 } ).catch( function () {} );
+			}
+		} );
+	} );
+} )();

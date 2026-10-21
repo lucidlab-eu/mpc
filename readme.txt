@@ -5,7 +5,7 @@ Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
 Stable tag: 6.0.395
-Works with Pro: 6.0.281
+Works with Pro: 6.0.282
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,10 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 * Install count: nothing is sent unless an administrator opts in, also on sites with a licensed Pro add-on. The ping now goes to the shared Lucid Lab address https://lucidlab.eu/wp-json/lucidlab/v1/free/ping and also names the plugin. Uninstalling removes the install ID and turns the setting off.
 * Header: a Documentation link next to the version number, and the page title now lines up with the icon.
 * Getting started: the Free and Pro feature lists now match what each edition does.
+* Get Pro buttons now link to the Pro product page (https://lucidlab.eu/product/media-products-cleanup-pro/).
+* Finished jobs: the panel can be collapsed to the right with the arrow button next to its title, and expanded again. The choice is remembered per user.
+* The main plugin page now uses the full screen width.
+* The Activate Pro button (Pro installed but not activated) is slightly less tall.
 = 6.0.394 =
 * Pro pages: locked Pro tabs now show a clearer Pro card with a feature list and a Get Pro button. Pro tabs carry a Pro badge in the tab menu.
 

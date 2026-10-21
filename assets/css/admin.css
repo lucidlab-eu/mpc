@@ -1081,6 +1081,45 @@
 	.lucidlab-mpc-jobs-layout { grid-template-columns:minmax(0,1fr); }
 	.lucidlab-mpc-finished-jobs dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0 16px; }
 }
+/* Finished Jobs can be collapsed to a thin strip at the right edge; the main column then uses the full width. */
+.lucidlab-mpc-finished-jobs-head { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
+.lucidlab-mpc-finished-jobs-body[hidden] { display:none!important; }
+#wpbody .lucidlab-mpc-wrap .lucidlab-mpc-finished-toggle { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; margin:0; padding:0; border:1px solid var(--mpc-card-line,#e2e8ee); border-radius:6px; background:#fff; color:#2271b1; cursor:pointer; box-shadow:none; }
+#wpbody .lucidlab-mpc-wrap .lucidlab-mpc-finished-toggle:hover,
+#wpbody .lucidlab-mpc-wrap .lucidlab-mpc-finished-toggle:focus { background:#f0f6fc; border-color:#2271b1; color:#135e96; }
+#wpbody .lucidlab-mpc-wrap .lucidlab-mpc-finished-toggle:focus-visible { outline:2px solid #2271b1; outline-offset:1px; }
+.lucidlab-mpc-finished-toggle .dashicons { font-size:18px; width:18px; height:18px; line-height:18px; }
+.lucidlab-mpc-jobs-layout.is-finished-collapsed { grid-template-columns:minmax(0,1fr) 44px; }
+.lucidlab-mpc-finished-jobs.lucidlab-mpc-card.is-collapsed { padding:10px 7px; gap:0; align-items:center; border-radius:12px; }
+.lucidlab-mpc-finished-jobs.is-collapsed .lucidlab-mpc-finished-jobs-head { flex-direction:column-reverse; justify-content:flex-start; gap:12px; }
+.lucidlab-mpc-finished-jobs.is-collapsed .lucidlab-mpc-finished-jobs-head h2 { writing-mode:vertical-rl; white-space:nowrap; font-size:13px; }
+@media(max-width:1500px) {
+	/* Single column: Finished Jobs sits under the content; collapsed keeps only its title row. */
+	.lucidlab-mpc-jobs-layout.is-finished-collapsed { grid-template-columns:minmax(0,1fr); }
+	.lucidlab-mpc-finished-jobs.lucidlab-mpc-card.is-collapsed { padding:12px 18px; align-items:stretch; border-radius:18px; }
+	.lucidlab-mpc-finished-jobs.is-collapsed .lucidlab-mpc-finished-jobs-head { flex-direction:row; justify-content:space-between; }
+	.lucidlab-mpc-finished-jobs.is-collapsed .lucidlab-mpc-finished-jobs-head h2 { writing-mode:horizontal-tb; font-size:15px; }
+	.lucidlab-mpc-finished-toggle .dashicons { transform:rotate(-90deg); }
+}
+/* The main plugin page uses the full screen width; inner layout grids are no longer capped. */
+#wpbody .lucidlab-mpc-wrap { max-width:none; width:auto; box-sizing:border-box; }
+.lucidlab-mpc-wrap .lucidlab-mpc-jobs-layout,
+.lucidlab-mpc-wrap .lucidlab-mpc-main-column,
+.lucidlab-mpc-wrap .lucidlab-mpc-admin-body,
+.lucidlab-mpc-wrap .lucidlab-mpc-admin-content,
+.lucidlab-mpc-wrap .lucidlab-mpc-panel,
+.lucidlab-mpc-wrap .lucidlab-mpc-welcome-plans,
+.lucidlab-mpc-wrap .lucidlab-mpc-backup-grid,
+.lucidlab-mpc-wrap .lucidlab-mpc-inventory-panel,
+.lucidlab-mpc-wrap .lucidlab-mpc-format-stats,
+.lucidlab-mpc-wrap .lucidlab-mpc-format-columns,
+.lucidlab-mpc-wrap .lucidlab-mpc-automation-columns,
+.lucidlab-mpc-wrap .lucidlab-mpc-quarantine-errors { max-width:none; }
+/* Activate Pro (Pro installed but not active): slightly less tall than a default admin button. */
+#wpbody .lucidlab-mpc-wrap .lucidlab-mpc-pro-notice--inactive .button.lucidlab-mpc-activate-pro { display:inline-flex; align-items:center; min-height:0; height:28px; line-height:26px; padding:0 12px; }
+@media (max-width:782px) {
+	#wpbody .lucidlab-mpc-wrap .lucidlab-mpc-pro-notice--inactive .button.lucidlab-mpc-activate-pro { height:36px; line-height:34px; }
+}
 /* Keep both job summaries together before the tabs on compact screens. */
 .lucidlab-mpc-setup-wizard{background:#fff;border:1px solid #dfe5eb;border-radius:10px;margin:0 42px 8px;padding:22px 24px}
 .lucidlab-mpc-setup-steps{max-width:720px;margin:0 auto 16px;padding-left:20px}

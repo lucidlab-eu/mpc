@@ -529,4 +529,6 @@ return array(
 	'Tick at least one field before applying.'             => __( 'Tick at least one field before applying.', 'lucidlab-mpc-cleanup' ),
 	'Cancelled.'                                           => __( 'Cancelled.', 'lucidlab-mpc-cleanup' ),
 	' B'                                                   => __( ' B', 'lucidlab-mpc-cleanup' ),
+	'Collapse Finished Jobs'                               => __( 'Collapse Finished Jobs', 'lucidlab-mpc-cleanup' ),
+	'Expand Finished Jobs'                                 => __( 'Expand Finished Jobs', 'lucidlab-mpc-cleanup' ),
 );
