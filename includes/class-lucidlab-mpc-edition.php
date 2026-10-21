@@ -34,6 +34,19 @@ final class LucidLab_MPC_Edition {
 		return self::pro_tabs();
 	}
 	/**
+	 * Address of the "Get Pro" links on locked Pro tabs.
+	 *
+	 * @return string
+	 */
+	public static function pro_url(): string {
+		/**
+		 * Filters the "Get Pro" link target.
+		 *
+		 * @param string $url Default the Lucid Lab product page.
+		 */
+		return (string) apply_filters( 'lucidlab_mpc_pro_url', 'https://lucidlab.eu/product/media-products-cleanup/' );
+	}
+	/**
 	 * Pro quarantine source.
 	 *
 	 * @param string $source Source.

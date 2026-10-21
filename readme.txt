@@ -4,7 +4,7 @@ Tags: media, cleanup, duplicate images, thumbnails, woocommerce
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.0.393
+Stable tag: 6.0.394
 Works with Pro: 6.0.281
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -68,6 +68,9 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 
 == Changelog ==
 
+= 6.0.394 =
+* Pro pages: locked Pro tabs now show a clearer Pro card with a feature list and a Get Pro button. Pro tabs carry a Pro badge in the tab menu.
+
 = 6.0.393 =
 * Fixed a PHP deprecation notice on WordPress 6.8 and later (setted_transient is now set_transient).
 * Import database backup: .sql.gz files were refused with "Import a .sql or .sql.gz database backup." They are accepted again; unsigned or changed dumps are still refused.
@@ -104,10 +107,6 @@ The JavaScript and CSS are shipped unminified and are the editable sources: asse
 
 = 6.0.386 =
 * Check live pages is faster (parallel requests, also on WooCommerce shops) and now also checks srcset sizes, CSS backgrounds, stylesheets, scripts, fonts, video, audio, documents and internal links, with a per-page report.
-
-= 6.0.385 =
-* New, off by default: an Options checkbox to tell Lucid Lab that this site uses the plugin (see External services).
-* Media index is rebuilt automatically when it no longer matches the media library.
 
 = Older versions =
 Release notes for earlier versions are at https://lucidlab.eu/changelog/ .
